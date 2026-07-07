@@ -284,4 +284,10 @@ python3 tests/test_install.py   # install.sh: fresh, merge, idempotent, re-point
 
 ## License
 
-No license yet — © 2026 cozytab, all rights reserved. Ask before reusing.
+[MIT](LICENSE) © 2026 cozytab.
+
+You may use, copy, modify, merge, publish, distribute, sublicense, and sell it —
+including commercially, and including in closed-source work. **The only
+requirement**: keep the copyright notice and the MIT permission text (i.e. the
+`LICENSE` file) in all copies or substantial portions. It's provided "as is",
+with no warranty and no liability on the author.
