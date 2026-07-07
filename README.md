@@ -85,7 +85,7 @@ most-shirked rules into hard blocks:
 | Hook | Event | Effect |
 |---|---|---|
 | **Profile Injector** | `SessionStart` | Auto-injects the discipline + the model-appropriate concurrency tier + recovers open ledger items — no need to type "use fable mode." |
-| **Spawn Guard** | `PreToolUse` (Agent/Task/Workflow) | Blocks dispatching a detailed subagent/Workflow before a ledger exists — forces the plan gate. |
+| **Spawn Guard** | `PreToolUse` (Agent/Task/Workflow) | Blocks a detailed spawn before a ledger exists (forces the plan gate), and blocks any spawn requesting a model **stronger than the session's** — the model ceiling is mechanical, not just prose. |
 | **Close Guard** | `Stop` | Blocks ending the turn while the ledger still has unchecked items — cures early stopping / spinning. |
 
 Design properties that make this safe to register globally:

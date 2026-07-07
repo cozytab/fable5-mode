@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
+    save_session_model,
 )
 
 # resolved from this file's real location, correct wherever the skill is cloned
@@ -120,6 +121,9 @@ def build_context(profile, model, fable_dir):
 
 def main():
     data = read_hook_input()
+    # Cache session model for the spawn guard's model ceiling — unconditional
+    # (a project may opt in mid-session), tiny, best-effort.
+    save_session_model(data.get("session_id"), data.get("model"))
     fable_dir = find_fable_dir(start_dir(data))
     if not fable_dir:
         return 0  # not opted in -> stay silent (preserve on-demand)

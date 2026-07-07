@@ -79,7 +79,7 @@ Claude 仍会用**你的**语言回复。
 | Hook | 事件 | 效果 |
 |---|---|---|
 | **Profile Injector** | `SessionStart` | 自动注入纪律 + 按模型选好的并发档位 + 恢复未勾的账本项——不用再手打"用 fable 模式"。 |
-| **Spawn Guard** | `PreToolUse`（Agent/Task/Workflow） | 没写账本就想派详细 subagent/Workflow，拦——逼你先过设计门禁。 |
+| **Spawn Guard** | `PreToolUse`（Agent/Task/Workflow） | 没写账本就想派详细 subagent/Workflow，拦——逼你先过设计门禁；同时机械执行**模型天花板**：任何想用比主会话更强模型的 spawn 直接拦下，不再只靠嘴上说。 |
 | **Close Guard** | `Stop` | 账本还有未勾项就想结束回合，拦——治提前收尾/空转。 |
 
 让它敢全局注册的几个设计属性：

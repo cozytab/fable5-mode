@@ -9,7 +9,7 @@ built around this repo's SPEC.md/PROGRESS.md conventions.
 | Hook | Event | What it does |
 |---|---|---|
 | `fable_profile_inject.py` | `SessionStart` | When the project has opted in, **auto-inject the tier by model + the six levers + ledger context recovery** (no need to type "use fable mode") |
-| `fable_spawn_guard.py` | `PreToolUse` (Agent\|Task\|Workflow) | When opted in but no ledger is written, **block dispatching a detailed subagent/Workflow** (forces you through the plan gate) |
+| `fable_spawn_guard.py` | `PreToolUse` (Agent\|Task\|Workflow) | When opted in: **block a detailed spawn with no ledger** (forces the plan gate) and **block any spawn requesting a model stronger than the session's** (the model ceiling) |
 | `fable_close_guard.py` | `Stop` | While the ledger still has unchecked items, **block ending the turn** (cures early stopping / spinning) |
 
 `_fable_common.py` is the shared helper for all three (read stdin, walk up to find `.fable/`, parse the ledger).
@@ -49,6 +49,23 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 - `- [ ]` = open, blocks stop.
 - `- [x]` / `- [~]` = closed.
 - SPEC.md/PROGRESS.md remain the durable design/progress docs; LEDGER.md is only the enforcement-state snapshot of "what I committed to this round."
+
+## Model ceiling (mechanical)
+
+fable-mode's purpose is Fable-5-grade results **without** reaching up to Fable 5,
+so the spawn guard blocks any spawn requesting a model **stronger than the
+session's** (ranked `haiku < sonnet < opus < fable`):
+
+- Checked on the `model` parameter (Agent/Task) and on `model: '...'` /
+  `model = "..."` literals inside Workflow scripts. The regex is key-prefixed,
+  so prose like "fable-mode" can never false-positive.
+- The session model comes from a per-session cache written at SessionStart by
+  the Profile Injector (`$TMPDIR/fable-mode-sessions/<session_id>.txt`, ~20
+  bytes, self-cleans after 7 days) — PreToolUse hooks never receive `model`.
+- Fail-open: unknown session model or unrecognized requested model -> allowed.
+- Opt-out: `FABLE_ESCALATION=on` (you genuinely intend upward deferral).
+- Checked before all exemptions — even a small spawn or a fork must not reach
+  above the session model.
 
 ## Exemptions & safety
 

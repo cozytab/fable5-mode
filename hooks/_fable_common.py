@@ -9,7 +9,10 @@ Design invariants (keep these true, they are the safety contract):
 """
 import json
 import os
+import re
 import sys
+import tempfile
+import time
 
 
 def read_hook_input():
@@ -60,6 +63,61 @@ def find_fable_dir(start):
 
 def ledger_path(fable_dir):
     return os.path.join(fable_dir, "LEDGER.md")
+
+
+# --- model-tier ranking & per-session model cache (for the model ceiling) ---
+
+TIER_ORDER = ("haiku", "sonnet", "opus", "fable")
+
+
+def model_tier(model_str):
+    """Rank a model string by capability keyword; None if unrecognized."""
+    s = (model_str or "").lower()
+    tiers = [i for i, k in enumerate(TIER_ORDER) if k in s]
+    return max(tiers) if tiers else None
+
+
+def _sessions_dir():
+    d = os.path.join(tempfile.gettempdir(), "fable-mode-sessions")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _safe_sid(session_id):
+    return re.sub(r"[^A-Za-z0-9._-]", "_", str(session_id))[:120]
+
+
+def save_session_model(session_id, model):
+    """Cache the session's model at SessionStart so PreToolUse guards (which
+    never receive `model`) can enforce the ceiling. Best-effort, fail-open."""
+    if not session_id or not model:
+        return
+    try:
+        d = _sessions_dir()
+        now = time.time()
+        for f in os.listdir(d):  # opportunistic self-cleanup, no SessionEnd hook needed
+            p = os.path.join(d, f)
+            try:
+                if now - os.path.getmtime(p) > 7 * 86400:
+                    os.remove(p)
+            except OSError:
+                pass
+        with open(os.path.join(d, _safe_sid(session_id) + ".txt"), "w",
+                  encoding="utf-8") as fh:
+            fh.write(str(model))
+    except Exception:
+        pass
+
+
+def load_session_model(session_id):
+    if not session_id:
+        return None
+    try:
+        with open(os.path.join(_sessions_dir(), _safe_sid(session_id) + ".txt"),
+                  encoding="utf-8") as fh:
+            return fh.read().strip() or None
+    except Exception:
+        return None
 
 
 def parse_ledger(path):

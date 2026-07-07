@@ -183,7 +183,7 @@ runs on Haiku by default; subagents inherit the session model when unsure).
 
 The six levers above are "discipline by prose" — Claude follows them on its honor. This layer turns the two most easily-shirked ones into Claude Code hooks that actually block (see `hooks/README.md`):
 
-- **Spawn Guard** (PreToolUse Agent/Task/Workflow): when a project has opted in but hasn't written a ledger, **block dispatching a detailed subagent/Workflow** — forcing you through the plan gate (lever 1).
+- **Spawn Guard** (PreToolUse Agent/Task/Workflow): when a project has opted in but hasn't written a ledger, **block dispatching a detailed subagent/Workflow** — forcing you through the plan gate (lever 1). It also enforces the **model ceiling mechanically**: any spawn requesting a model stronger than the session's (haiku < sonnet < opus < fable) is blocked — checked on the `model` param and on `model:` literals inside Workflow scripts; unknown models fail open; `FABLE_ESCALATION=on` disables. The session model is cached per-session by the Profile Injector (PreToolUse hooks never receive it).
 - **Close Guard** (Stop): while the ledger still has unchecked items, **block ending the turn** — curing lever 2's "sneaking off before acceptance" and the officially-named "early stopping / spinning."
 - **Profile Injector** (SessionStart): when a project has opted in, **auto-inject the tier by model** (`model` contains fable -> throughput tier, otherwise -> conservative tier; env `FABLE_MODE_PROFILE` overrides) + a reminder of the six levers + "context recovery" of unchecked ledger items. No need to type "use fable mode" — entering a fable-mode project auto-carries the discipline and the right tier.
 

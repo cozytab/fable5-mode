@@ -98,6 +98,68 @@ p = subprocess.run([sys.executable, CLOSE], input="}{bad", capture_output=True,
                    text=True, cwd=proj(git=True))
 check("close/malformed-failopen", p.returncode, 0)
 
+# ---- Model ceiling (spawn guard + injector session cache) ----
+INJ = os.path.join(HOOKS, "fable_profile_inject.py")
+
+def run_env(script, payload, env=None):
+    e = dict(os.environ); e.update(env or {})
+    p = subprocess.run([sys.executable, script], input=json.dumps(payload),
+                       capture_output=True, text=True, env=e)
+    return p.returncode
+
+def seed_session(sid, model):
+    """SessionStart caches {session_id -> model} for the guard."""
+    subprocess.run([sys.executable, INJ], input=json.dumps(
+        {"cwd": proj(git=True), "session_id": sid, "model": model}),
+        capture_output=True, text=True)
+
+LEDGER_OK = "- [ ] 1. a card\n"
+seed_session("fbtest-ceil-opus", "claude-opus-4-8")
+
+# 1. opus session + spawn model=fable -> BLOCK (even small prompt, ledger present)
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/fable-blocked", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
+      "tool_name": "Agent", "tool_input": {"prompt": SMALL, "model": "fable"}}), 2)
+
+# 2. downgrade (sonnet) -> allow
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/sonnet-allowed", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
+      "tool_name": "Agent", "tool_input": {"prompt": SMALL, "model": "sonnet"}}), 0)
+
+# 3. no model param (inherit) -> allow
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/inherit-allowed", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
+      "tool_name": "Agent", "tool_input": {"prompt": SMALL}}), 0)
+
+# 4. FABLE_ESCALATION=on -> allow upward
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/escalation-on-allows", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
+      "tool_name": "Agent", "tool_input": {"prompt": SMALL, "model": "fable"}},
+      env={"FABLE_ESCALATION": "on"}), 0)
+
+# 5. unknown session model -> fail-open allow
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/unknown-session-failopen", run_env(SPAWN, {"cwd": d,
+      "session_id": "fbtest-ceil-nocache", "tool_name": "Agent",
+      "tool_input": {"prompt": SMALL, "model": "fable"}}), 0)
+
+# 6. Workflow script with model: 'fable' literal -> BLOCK
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/workflow-script-blocked", run_env(SPAWN, {"cwd": d,
+      "session_id": "fbtest-ceil-opus", "tool_name": "Workflow",
+      "tool_input": {"script": "await agent('x', {model: 'fable'})"}}), 2)
+
+# 7. REGRESSION: prose mentioning 'fable-mode' (no model key) must NOT block
+d = proj(with_fable=True, git=True, ledger=LEDGER_OK)
+check("ceiling/no-false-positive-on-prose", run_env(SPAWN, {"cwd": d,
+      "session_id": "fbtest-ceil-opus", "tool_name": "Workflow",
+      "tool_input": {"script": "// follow the fable-mode protocol strictly"}}), 0)
+
+# 8. no .fable dir -> ceiling inert even for model=fable
+d = proj(git=True)
+check("ceiling/no-fable-inert", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
+      "tool_name": "Agent", "tool_input": {"prompt": SMALL, "model": "fable"}}), 0)
+
 for d in tmps:
     shutil.rmtree(d, ignore_errors=True)
 
