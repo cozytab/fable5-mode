@@ -28,7 +28,9 @@ from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
 )
 
-SKILL = "~/.claude/skills/fable-mode/SKILL.md"
+# resolved from this file's real location, correct wherever the skill is cloned
+SKILL = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SKILL.md")
 MAX_LIST = 12
 
 
