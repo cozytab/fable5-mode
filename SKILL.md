@@ -168,9 +168,13 @@ runs on Haiku by default; subagents inherit the session model when unsure).
 - Only downgrade a card whose **acceptance test is machine-checkable** — then a
   weak executor's failure is caught immediately and cheaply. Vague spec or
   judgment-laden card -> session model, no exceptions.
-- **Escalation ladder**: acceptance fails once -> retry same executor with the
-  failure output; fails twice -> escalate one model tier up (or pull back into
-  the main context). Never let a downgraded executor grind.
+- **Escalation ladder with a ceiling**: acceptance fails once -> retry same
+  executor with the failure output; fails twice -> escalate one model tier up,
+  **capped at the session model** — the top of the ladder is pulling the card
+  back into the main context, not reaching for a stronger model. fable-mode
+  exists to get Fable-5-grade results *without* Fable 5: never spawn a subagent
+  on a model stronger than the session's (that silently burns premium quota).
+  Deferring upward is allowed only with explicit `FABLE_ESCALATION=on`.
 - **The verifier must be at least as strong as the implementer** — verification
   is what makes everything else safe, so it is never downgraded.
 - When unsure which row a card belongs to, inherit the session model.

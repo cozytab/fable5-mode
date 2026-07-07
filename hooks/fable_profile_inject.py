@@ -64,7 +64,9 @@ def build_context(profile, model, fable_dir):
         "model tier; mechanical gather/format/search may go to a cheap tier at "
         "low effort. Safety net: only downgrade cards whose acceptance is "
         "machine-checkable; acceptance failed twice -> escalate the model tier "
-        "or pull the card back inline; the verifier must be at least as strong "
+        "CAPPED AT this session's model (the top of the ladder is pulling the "
+        "card back inline, never a stronger model — do not spawn subagents "
+        "above the session model); the verifier must be at least as strong "
         "as the implementer. When unsure, inherit the session model."
     )
 

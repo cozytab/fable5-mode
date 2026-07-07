@@ -118,7 +118,7 @@ d = proj(with_fable=True)
 rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
 c = ctx(out)
 check("inject/routing-conservative", rc == 0 and c and "Model routing" in c
-      and "escalate the model tier" in c and "verifier must be at least as strong" in c)
+      and "CAPPED AT this session's model" in c and "verifier must be at least as strong" in c)
 d = proj(with_fable=True)
 rc, out = run({"cwd": d, "model": "claude-fable-5"})
 c = ctx(out)

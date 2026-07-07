@@ -208,9 +208,12 @@ implementation card may drop one tier; mechanical gather/format work goes to a
 cheap tier at low effort. This mirrors Anthropic's own practice (Opus-class lead
 + Sonnet-class subagents in their research system, +90.2% over single-agent).
 What makes downgrading safe is the safety net: only cards with machine-checkable
-acceptance are downgraded, two failed acceptances escalate the model tier, and
-the verifier is always at least as strong as the implementer. When unsure,
-inherit the session model.
+acceptance are downgraded, two failed acceptances escalate the model tier —
+**capped at the session model** (the top of the ladder is pulling the card back
+inline, never a stronger model: fable-mode exists to get Fable-5-grade results
+*without* Fable 5, so it never quietly reaches upward) — and the verifier is
+always at least as strong as the implementer. When unsure, inherit the session
+model.
 
 ## The Fable 5 habit set
 
