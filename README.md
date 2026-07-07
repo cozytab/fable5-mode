@@ -201,6 +201,16 @@ fable-mode's concurrency isn't a fixed number.
 The Profile Injector picks the tier automatically by model
 (`FABLE_MODE_PROFILE=auto|conservative|throughput` overrides).
 
+## No stronger model? It degrades, never stalls
+
+fable-mode is honest about capability walls — but "switch to Fable 5" is a dead
+end if you can't run Fable 5. So a non-Fable session is automatically told **not
+to defer hard steps to a stronger model or stall waiting for one**. Instead it
+compensates on the model you have: decompose the wall into smaller verifiable
+steps, best-of-N + a judge, make tools/tests the ground truth, and flag residual
+risk instead of blocking. If you *do* have a stronger tier to hand off to, set
+`FABLE_ESCALATION=on`.
+
 ## Layout
 
 ```

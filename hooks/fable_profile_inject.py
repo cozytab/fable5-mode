@@ -13,6 +13,11 @@ Fail-open: any error  ->  exit 0 with no output.
 Tier selection (env FABLE_MODE_PROFILE overrides: auto|conservative|throughput):
   model contains "fable"  ->  throughput (aggressive parallel delegation)
   otherwise / model absent ->  conservative (<=5 concurrent, inline-first)
+
+Graceful degradation: a conservative (non-Fable) session also gets a
+"don't defer to a stronger model, don't stall" instruction, so work never gets
+stuck waiting for a Fable 5 the user can't run. Set FABLE_ESCALATION=on to opt
+out (you genuinely have a stronger tier available).
 """
 import json
 import os
@@ -61,6 +66,20 @@ def build_context(profile, model, fable_dir):
         "state machine - [ ]/- [x]/- [~]). The guard hooks block 'spawning an "
         "agent with no ledger' and 'ending the turn with unchecked ledger items'.",
     ]
+
+    # Graceful degradation: a non-Fable session assumes no stronger tier to
+    # defer to, so tell the model to never stall/hand off. FABLE_ESCALATION=on
+    # opts back in (you genuinely have a stronger model available).
+    if profile == "conservative" and \
+            os.environ.get("FABLE_ESCALATION", "auto").lower() != "on":
+        lines.append(
+            "No stronger model is assumed available this session: do NOT defer "
+            "hard steps to Fable 5 or stall waiting for a model you can't run. "
+            "Instead decompose the hard part into smaller verifiable steps, use "
+            "best-of-N + a judge, make tools/tests the ground truth, and flag "
+            "residual risk instead of blocking. (Set FABLE_ESCALATION=on if you "
+            "do have a stronger tier to defer to.)"
+        )
 
     # Context recovery: surface open ledger items on (re)start.
     try:

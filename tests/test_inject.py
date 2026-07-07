@@ -83,6 +83,24 @@ check("inject/valid-json-envelope", ok)
 p = subprocess.run([sys.executable, INJ], input="}{garbage", capture_output=True, text=True)
 check("inject/malformed-failopen", p.returncode == 0)
 
+# 10. non-Fable session gets the no-escalation / graceful-degradation posture
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/conservative-no-escalation", rc == 0 and c and "do NOT defer" in c and "FABLE_ESCALATION" in c)
+
+# 11. Fable/throughput session does NOT get the no-escalation line
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-fable-5"})
+c = ctx(out)
+check("inject/throughput-no-escalation-absent", rc == 0 and c and "do NOT defer" not in c)
+
+# 12. FABLE_ESCALATION=on suppresses the no-escalation line even for opus
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"}, env={"FABLE_ESCALATION": "on"})
+c = ctx(out)
+check("inject/escalation-on-suppresses", rc == 0 and c and "CONSERVATIVE" in c and "do NOT defer" not in c)
+
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

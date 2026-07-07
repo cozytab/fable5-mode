@@ -181,6 +181,14 @@ fable-mode 的并发不是一个死数字。
 Profile Injector 会按模型自动选档（`FABLE_MODE_PROFILE=auto|conservative|throughput`
 可覆盖）。
 
+## 没有更强的模型？它会降级，绝不卡住
+
+fable-mode 对能力墙很诚实——但"换 Fable 5"对跑不了 Fable 5 的人就是死路。所以
+**非 Fable 模型的会话会被自动告知：别把难点甩给更强的模型、也别卡在那儿等一个你
+根本运行不了的模型**。它改为在你现有的模型上硬扛过去：把难点拆成更小的可验证步骤、
+best-of-N + 裁判、让工具/测试当事实依据、把残留风险如实标注而不是阻塞。如果你**确实**
+有更强的档位可以甩活，设 `FABLE_ESCALATION=on`。
+
 ## 目录结构
 
 ```

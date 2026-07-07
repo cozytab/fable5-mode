@@ -24,8 +24,34 @@ You are now in fable-mode. Premise: Fable 5's feats ("cloning a large game in a 
 
 - **Use**: substantial development tasks (new features, new projects, clones, refactors), deliverables that must be right the first time, multi-file cross-system changes, research reports.
 - **Don't use**: single-file tweaks, Q&A, small tasks you can verify at a glance — just do them, don't wrap them in process (that's slower and pricier).
-- **Honest boundary**: these are real capability walls orchestration can't paper over — switch to Fable 5 when you hit them: a single very long reasoning chain (deriving a complex algorithm from scratch), holding a huge codebase in mind at once, strong taste/aesthetic judgment. When you hit one, tell the user plainly "this step is worth switching to Fable 5."
+- **Honest boundary**: these are real capability walls orchestration can't fully paper over — a single very long reasoning chain (deriving a complex algorithm from scratch), holding a huge codebase in mind at once, strong taste/aesthetic judgment. **If** a stronger model (e.g. Fable 5) is available, that step is worth switching to it, and you should say so plainly. **If it is not** — the common case — do **not** stall or hand off to a model you can't run; degrade gracefully instead (see "When no stronger model is available" below).
 - **Tool-reliability red line**: WebSearch/WebFetch-style tools can hang without timing out on some sites and stall an entire Workflow. Any web-scraping subagent must use `curl --max-time`, not WebFetch; long Workflows must have a watchdog. This class of hang is a tool-layer problem, independent of the orchestration approach.
+
+## When no stronger model is available (graceful degradation)
+
+You may be running on a model with no access to a stronger tier. Then "switch to
+Fable 5" is a dead end — and you must **never stall, hand off, or end the turn
+waiting for a model you can't run**. Compensate and push through on the model you
+have:
+
+- **Decompose the wall.** A "single long reasoning chain" wall usually dissolves
+  when you break it into smaller steps that each fit the current model, verifying
+  after each. Trade one hard leap for many checkable small ones.
+- **Best-of-N + judge.** Generate several independent attempts and pick or
+  synthesize the best — multiple weaker passes plus a judge approximate one
+  stronger pass.
+- **Make tools the ground truth.** Don't derive-and-hope: run code, tests, a
+  REPL, or a type-checker to settle correctness instead of reasoning it out
+  perfectly. Fetch a reference implementation/example rather than deriving from
+  scratch.
+- **Iterate with tight verification** instead of aiming for one perfect shot.
+- **Flag residual risk, don't block.** If a step is still shaky after all that,
+  deliver the best version, state plainly what's uncertain and why, and let the
+  user decide — never leave the task stuck.
+
+This posture is auto-injected when the running model isn't Fable 5 (see the
+Profile Injector). Set `FABLE_ESCALATION=on` only if you genuinely have a
+stronger tier to defer to.
 
 ## The six levers (execute in order)
 
