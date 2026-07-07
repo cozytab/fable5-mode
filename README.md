@@ -84,7 +84,7 @@ most-shirked rules into hard blocks:
 
 | Hook | Event | Effect |
 |---|---|---|
-| **Profile Injector** | `SessionStart` | Auto-injects the discipline + the model-appropriate concurrency tier + recovers open ledger items — no need to type "use fable mode." |
+| **Profile Injector** | `SessionStart` | Auto-injects the discipline, **sized to the ledger state** — full during an active round, a one-liner when idle or paused — plus the model-appropriate tier and open-item recovery. |
 | **Spawn Guard** | `PreToolUse` (Agent/Task/Workflow) | Blocks a detailed spawn before a ledger exists (forces the plan gate), and blocks any spawn requesting a model **stronger than the session's** — the model ceiling is mechanical, not just prose. |
 | **Close Guard** | `Stop` | Blocks ending the turn while the ledger still has unchecked items — cures early stopping / spinning. |
 
@@ -186,6 +186,12 @@ tier; you can't dispatch a detailed agent without a ledger; you can't end a turn
 with unchecked cards. Mark cards `- [x]` (done + verified) or
 `- [~] ... -- deferred: reason` to close them. To turn enforcement off, check
 everything or `rm -rf .fable`.
+
+**Big project, small tasks?** Enforcement is per-*round*, not per-*keystroke*:
+with all cards closed (idle) the guards stay quiet and quick fixes flow freely
+with near-zero injection. Mid-round, drop a `PAUSED: reason` line into
+`.fable/LEDGER.md` to do unrelated work without being nagged (the model ceiling
+stays active); remove it to resume the round.
 
 ## Concurrency tiers
 

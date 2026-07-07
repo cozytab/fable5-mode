@@ -44,11 +44,27 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 - [ ] 1. an open card (each card with a machine-checkable acceptance test)
 - [x] 2. done and verified
 - [~] 3. not this round -- deferred: reason
+PAUSED: reason        <- optional line anywhere: suspend enforcement
 ```
 
 - `- [ ]` = open, blocks stop.
 - `- [x]` / `- [~]` = closed.
+- `PAUSED` (line prefix, case-insensitive) = enforcement off **except the model
+  ceiling** (quota protection is not workflow discipline). For user-steered
+  work unrelated to the current round; remove the line to resume.
 - SPEC.md/PROGRESS.md remain the durable design/progress docs; LEDGER.md is only the enforcement-state snapshot of "what I committed to this round."
+
+## Per-task granularity (big projects)
+
+Arming is per-project (`.fable/`), but pressure is per-round via the ledger
+state, so small tasks in a big project aren't taxed:
+
+| Ledger state | Guards | Injection |
+|---|---|---|
+| starting (no cards yet) | design gate armed | full (~1.6KB) |
+| **active** (open `- [ ]`) | full enforcement | full + context recovery |
+| **idle** (all closed) | quiet | one-liner (~0.4KB) |
+| **paused** (PAUSED line) | off except model ceiling | one-liner (~0.2KB) |
 
 ## Model ceiling (mechanical)
 

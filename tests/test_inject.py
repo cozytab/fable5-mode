@@ -125,6 +125,20 @@ c = ctx(out)
 check("inject/routing-throughput", rc == 0 and c and "Model routing" in c
       and "When unsure, inherit the session model" in c)
 
+# 17. idle ledger (all closed) -> minimal injection, small tasks not taxed
+d = proj(with_fable=True, ledger="- [x] 1. done\n- [~] 2. skip -- deferred: n/a\n")
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/idle-minimal", rc == 0 and c and "ledger idle" in c
+      and "Model routing" not in c and len(c) < 600)
+
+# 18. PAUSED line -> one-liner, ceiling still mentioned
+d = proj(with_fable=True, ledger="- [ ] 1. big card\nPAUSED: side work for user\n")
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/paused-oneliner", rc == 0 and c and "PAUSED" in c
+      and "model ceiling" in c and "Context recovery" not in c and len(c) < 400)
+
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

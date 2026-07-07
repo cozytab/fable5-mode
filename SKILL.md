@@ -18,213 +18,107 @@ triggers:
 
 # fable-mode (Fable-grade work-discipline protocol)
 
-You are now in fable-mode. Premise: Fable 5's feats ("cloning a large game in a few hours") come half from the model and half from **longer autonomy, harsher self-verification, and less corner-cutting**. That second half is model-independent — this protocol supplies it. The core trade this protocol makes: **spend extra orchestration steps to buy single-pass output quality**. That costs more tokens on the disciplined steps, but the net over a whole task can break even or even drop — it avoids the rework loops and bloated-context waste a naive attempt burns.
+You are now in fable-mode. Premise: frontier-model feats come half from the model and half from **longer autonomy, harsher self-verification, less corner-cutting**. That second half is model-independent — this protocol supplies it. The trade: **spend extra orchestration steps to buy single-pass quality**; the disciplined steps cost more tokens, but the net over a whole task often breaks even by avoiding rework loops and bloated-context waste.
 
 ## When to use / not use
 
-- **Use**: substantial development tasks (new features, new projects, clones, refactors), deliverables that must be right the first time, multi-file cross-system changes, research reports.
-- **Don't use**: single-file tweaks, Q&A, small tasks you can verify at a glance — just do them, don't wrap them in process (that's slower and pricier).
-- **Honest boundary**: these are real capability walls orchestration can't fully paper over — a single very long reasoning chain (deriving a complex algorithm from scratch), holding a huge codebase in mind at once, strong taste/aesthetic judgment. **If** a stronger model (e.g. Fable 5) is available, that step is worth switching to it, and you should say so plainly. **If it is not** — the common case — do **not** stall or hand off to a model you can't run; degrade gracefully instead (see "When no stronger model is available" below).
-- **Tool-reliability red line**: WebSearch/WebFetch-style tools can hang without timing out on some sites and stall an entire Workflow. Any web-scraping subagent must use `curl --max-time`, not WebFetch; long Workflows must have a watchdog. This class of hang is a tool-layer problem, independent of the orchestration approach.
+- **Use**: substantial dev tasks (features, projects, clones, refactors), must-be-right deliverables, multi-file changes, research reports.
+- **Don't use**: single-file tweaks, Q&A, small tasks verifiable at a glance — just do them. **Discipline is per-task, not per-project**: inside a fable-mode project a quick fix is still just a quick fix (guards stay quiet when the ledger is idle or paused — see Enforcement).
+- **Honest boundary**: real capability walls exist — a single very long reasoning chain, holding a huge codebase at once, strong aesthetic judgment. If a stronger model is available, say so plainly and let the user decide. If not (the common case), degrade gracefully — next section.
+- **Tool-reliability red line**: web-fetch tools can hang without timeout and stall a Workflow. Scraping subagents use `curl --max-time`, never WebFetch; long Workflows get a watchdog.
 
-## When no stronger model is available (graceful degradation)
+## When no stronger model is available
 
-You may be running on a model with no access to a stronger tier. Then "switch to
-Fable 5" is a dead end — and you must **never stall, hand off, or end the turn
-waiting for a model you can't run**. Compensate and push through on the model you
-have:
+Never stall, hand off, or end the turn waiting for a model you can't run:
 
-- **Decompose the wall.** A "single long reasoning chain" wall usually dissolves
-  when you break it into smaller steps that each fit the current model, verifying
-  after each. Trade one hard leap for many checkable small ones.
-- **Best-of-N + judge.** Generate several independent attempts and pick or
-  synthesize the best — multiple weaker passes plus a judge approximate one
-  stronger pass.
-- **Make tools the ground truth.** Don't derive-and-hope: run code, tests, a
-  REPL, or a type-checker to settle correctness instead of reasoning it out
-  perfectly. Fetch a reference implementation/example rather than deriving from
-  scratch.
-- **Iterate with tight verification** instead of aiming for one perfect shot.
-- **Flag residual risk, don't block.** If a step is still shaky after all that,
-  deliver the best version, state plainly what's uncertain and why, and let the
-  user decide — never leave the task stuck.
+- **Decompose the wall** into smaller steps that each fit the current model; verify each.
+- **Best-of-N + judge**: several independent attempts approximate one stronger pass.
+- **Tools as ground truth**: run code/tests/REPL instead of deriving perfectly; fetch a reference implementation rather than re-deriving.
+- **Flag residual risk and deliver** — state what's uncertain and why; never leave the task stuck.
 
-This posture is auto-injected when the running model isn't Fable 5 (see the
-Profile Injector). Set `FABLE_ESCALATION=on` only if you genuinely have a
-stronger tier to defer to.
+(Set `FABLE_ESCALATION=on` only if a stronger tier genuinely exists to defer to.)
 
 ## The six levers (execute in order)
 
 ### 1. Plan Gate
-Before writing code, produce `docs/SPEC.md`: requirements, approach, **task-card list** (starter skeletons in `templates/`). Each card:
-- granularity <= what one fresh context can hold (rule of thumb: <= 5 files / <= 300 lines per card);
-- must state a **machine-checkable acceptance test** (command, expected output, screenshot points) — "looks right" is not acceptance;
-- annotate cross-card dependencies; mark cards that can run in parallel.
-
-A weak model's biggest failure mode is "thinking while typing, changing its mind halfway." The plan gate concentrates thinking in the cheapest phase.
-
-**Choice of executor is Claude's own judgment, not a hard rule.** Subagent, Workflow, an external executor (e.g. codex exec), or doing it yourself — decide per card by the nature of the work / quality bar / quota level. Quality first; when in doubt, don't split — if you have any doubt that splitting preserves quality, do it yourself. **An external executor is one option, not this protocol's default.**
+Before code, write `docs/SPEC.md`: requirements, approach, **task cards** (skeletons in `templates/`). Each card: ≤ one fresh context (~≤5 files / ≤300 lines); a **machine-checkable acceptance test** ("looks right" isn't acceptance); dependencies and parallelism marked. Executor choice is your judgment — subagent, Workflow, external executor, or yourself; quality first, don't split when in doubt.
 
 ### 2. Small-card execution + per-card acceptance
-- Execute each card in a **fresh context** (subagent or codex exec), feeding only the relevant SPEC excerpt + that card's description — no reasoning garbage from prior cards.
-- **Route model & effort per card** (see "Model & effort routing" below): judgment/design/debugging/verification stay on the session model; a well-specified implementation card may drop one tier; mechanical work may drop further. What makes this safe is the acceptance test — a weak executor's failure is caught immediately and cheaply. When unsure, inherit the session model.
-- Run the card's acceptance command the moment it's done; **do not advance until it passes**. On 2 failures, escalate back to the main context to crack it, rather than letting the executor flail.
-- Parallel cards fan out via Agent/Workflow; for concurrency see "Concurrency tiers" below — default to the **conservative tier (<=5 concurrent)**, and open the **throughput tier** only when the user explicitly asks.
+Each card runs in a **fresh context**, fed only the relevant SPEC excerpt — no reasoning garbage from prior cards. Run acceptance the moment it's done; **don't advance until it passes**. Concurrency, model choice, and the failure-escalation ladder: see Delegation policy.
 
-### 3. Adversarial self-check (the core of trading tokens for quality)
-Important output is never "generate and ship":
-- **Critical modules**: after generating, dispatch 2-3 independent viewpoints to refute (correctness / edge & failure paths / integration with existing code); one solid hit means rework.
-- **Hard problems / wide solution space** (architecture choice, algorithms, core game-feel): generate N approaches in parallel + review-and-synthesize, take the winner and graft the losers' best ideas. When single-pass quality isn't enough, approximate it with multiple independent generations + a judge.
-- The self-check agent's prompt must say "assume it's broken, try hard to falsify," not "take a look" (the latter just goes through the motions).
+### 3. Adversarial self-check
+Important output is never "generate and ship". Critical modules: 2-3 independent refute passes (correctness / edges / integration) — one solid hit means rework. Wide solution spaces: N approaches + judge + synthesize. **Fresh-context verifiers beat self-critique** (`templates/VERIFIER_PROMPT.md`); verifier prompts say "assume broken, falsify hard", never "take a look".
 
 ### 4. Real-product verification (iron rule)
-All-green static checks != it works. Every milestone must run the real product end-to-end: start the service / open the preview / produce a real device build, exercise the core path, and leave evidence (screenshots, logs, test output). This is doubly true for toolchain/MCP output — it must be walked through a real AI-dev workflow. When reporting to the user, give evidence, not adjectives.
+All-green static checks ≠ it works. Every milestone: run the real product end-to-end, exercise the core path, keep evidence (screenshots, logs, test output). Report evidence, not adjectives.
 
 ### 5. Context hygiene (external memory)
-- Keep `docs/SPEC.md` (requirements + approach) and `docs/PROGRESS.md` (progress + decisions + gotchas) updated in real time, not batched.
-- Segment long tasks: at the start of each segment, read only SPEC + PROGRESS to restore the scene; don't lean on the previous segment's conversation memory. Carrying tens of thousands of tokens of failed-attempt reasoning in a 200k context makes the model noticeably dumber — better to start a fresh context.
-- Write every gotcha into PROGRESS's "gotchas" section the moment you hit it, so the next context doesn't step on it again.
+`docs/SPEC.md` + `docs/PROGRESS.md` updated in real time, not batched. Segment long tasks: each segment restores from SPEC + PROGRESS only. Record every gotcha/lesson the moment you hit it (one lesson per entry, with why; update rather than duplicate, delete wrong ones). Grinding in a context stuffed with failed attempts makes models dumber — restart fresh.
 
-### 6. Checkpoint autonomy (long tasks don't run naked)
-- Background long tasks must have a **watchdog**: monitor output-file mtime and wake up to handle it if nothing moves past a threshold — never let it hang silently overnight.
-- Organize work to be resumable (Workflow resume / codex exec in batches / task cards are natural checkpoints); if any step dies, you lose at most one card.
-- Batch dispatch obeys the current concurrency tier (see "Concurrency tiers"); regardless of tier, what's forbidden is **"brainless fan-out"** (a one-shot spray with no verification, no watchdog, no checkpoints), not parallelism itself. The throughput tier still requires async communication + staged verification as a backstop.
+### 6. Checkpoint autonomy
+Background long tasks get a **watchdog** (output-file mtime). Organize resumable: any step dying loses at most one card. Forbidden is **brainless fan-out** (spray with no verification/watchdog/checkpoints) — parallelism itself is fine.
 
-## The Fable 5 habit set (emulate these)
+## The Fable 5 habit set (any model, always)
 
-Distilled from Anthropic's official Fable 5 prompting guidance — the concrete
-behaviors that separate frontier output from weaker-model output. Adopt all of
-them, on any model:
+1. **Ground every progress claim** in a tool result from this session; unverified means saying "unverified".
+2. **Never end on a promise**: if your last paragraph is a plan / next-steps / "I'll now X" you could act on, act now. End only when done or blocked on user-only input.
+3. **Lead with the outcome**; keep output short by selectivity, not compression.
+4. **Pause only where the user is genuinely needed**: destructive/irreversible actions, real scope changes, user-only input.
+5. **Assessment vs action**: when the user describes a problem or asks a question, deliver the assessment and stop; before state-changing commands, check the evidence supports that specific action.
+6. **Give the reason, not only the request**, when delegating — intent travels with the card.
 
-1. **Ground every progress claim.** Before reporting progress, audit each claim
-   against a tool result from this session. Only report work you can point to
-   evidence for; if something isn't verified yet, say so explicitly.
-2. **Never end on a promise.** Before ending your turn, check your last
-   paragraph: if it is a plan, an analysis, a question you could answer, a list
-   of next steps, or "I'll now do X" — do that work now with tool calls. End
-   only when the task is complete or blocked on input only the user has.
-3. **Lead with the outcome.** Your first sentence answers "what happened / what
-   did you find." Keep output short by being selective about what to include,
-   not by compressing into fragments or arrow-chains.
-4. **Pause only where the user is genuinely needed**: a destructive or
-   irreversible action, a real scope change, or input only they can provide.
-   Otherwise proceed.
-5. **Assessment vs. action.** When the user describes a problem or thinks out
-   loud, the deliverable is your assessment — report findings and stop; don't
-   apply fixes unasked. Before any state-changing command, check the evidence
-   actually supports that specific action.
-6. **Fresh-context verifiers beat self-critique.** At intervals, verify your
-   work with a separate fresh-context pass (subagent or re-read after a reset)
-   against the SPEC — the generator should not be the only judge
-   (see `templates/VERIFIER_PROMPT.md`).
-7. **Route model & effort per task** (two separate dials — see "Model & effort
-   routing"): judgment/verification/design stay on the session model at max/high
-   effort; well-specified implementation may drop one model tier; mechanical
-   gathering goes cheap at low effort. Verification is never downgraded.
-8. **Give the reason, not only the request.** When delegating, pass why the
-   task matters and what the output enables — intent travels with the card.
-9. **Keep a lessons file.** Record corrections and confirmed approaches (one
-   lesson per entry, with why); update rather than duplicate; delete lessons
-   that turn out wrong. PROGRESS.md's "gotchas" section is the minimum form.
+## Delegation policy (concurrency, model, escalation)
 
-## Concurrency tiers (conservative / throughput)
+**Concurrency** — conservative by default: **≤5 concurrent**, inline-first, don't split when unsure. The throughput tier (dispatch readily, async, no fixed cap — field deployments 10-500+; subagents are one level deep) opens **only** when the user explicitly asks or the session model is Fable-class; state the honest cost: ~15x tokens + rate-limit risk. Never open it silently.
 
-fable-mode's concurrency is not a fixed number — pick a tier by the task. **Default conservative** unless the user explicitly asks for throughput.
+**Model routing (capability-matched)** — mirrors Anthropic's own practice (Opus-class lead + Sonnet-class subagents; Explore on Haiku; inherit when unsure):
 
-### Conservative tier (default)
-- **Concurrency cap <=5**, a local rate-limit guardrail against throttling avalanches.
-- For: everyday development, quota-sensitive work, single-machine runs, quality-first and not in a hurry.
-- Orchestration can be sync or async; when there aren't many cards, not splitting and doing them yourself in sequence is often steadier.
-
-### Throughput tier (only when the user explicitly enables it)
-- **Trigger**: the user says things like "match the official Fable playbook / max throughput / dispatch more agents / don't care about tokens / finish ASAP."
-- **Aligns with the official Fable 5 approach** (per Anthropic's official prompting docs + third-party field reports):
-  - Official guidance is "**dispatch parallel subagents more readily, communicate async, don't block waiting for each return**," with **no official concurrency cap**; field deployments range **10 ~ 500+** depending on the task.
-  - Hard structural limit: **subagents are only one level deep — they can't spawn subagents** (Workflow nesting is also one level).
-  - Tell the user the cost honestly: an orchestrator+parallel architecture can improve on a single agent by ~**90%**, but burns ~**15x tokens**, and higher concurrency is likelier to hit API rate limits.
-- **Local implementation**: opening up concurrency is not running naked — you must still have (1) async non-blocking (the orchestrator keeps working after dispatching, doesn't await each one), (2) per-segment verification, (3) a watchdog, (4) resumable checkpoints. Web-scraping subagents still obey the red line: `curl --max-time`, not WebFetch.
-- **Routing still holds at high fan-out** (see "Model & effort routing"): the lead and all verification stay on the session model; well-specified implementation may drop one tier; mechanical work goes cheap. High fan-out makes the escalation ladder *more* important, not less — every downgraded card needs its machine-checkable acceptance, and two failures escalate the tier.
-
-### Pick-a-tier in one line
-When unsure, use the conservative tier and tell the user "for more speed you can enable the throughput tier, at the cost of ~15x tokens + rate-limit risk"; let the user decide — don't burn money by default.
-
-## Model & effort routing (capability-matched, safety-netted)
-
-Neither blanket rule is right: "never downgrade" wastes money on work a smaller
-model does equally well; "offload to cheap" hands problem-solving to models that
-can't solve them. Route by what the card actually demands — this mirrors
-Anthropic's own practice (their research system runs an Opus-class lead with
-Sonnet-class subagents, +90.2% over single-agent; Claude Code's Explore agent
-runs on Haiku by default; subagents inherit the session model when unsure).
-
-| Card type | Model | Effort |
+| Card | Model | Effort |
 |---|---|---|
-| Orchestration, design, architecture choice, debugging, root-cause | **session model** (the lead never downgrades) | high/max |
-| Verification, acceptance judging, adversarial refute | **session model** | max |
-| Implementation of a **well-specified** card (tight spec + machine-checkable acceptance) | one tier down is fine | high |
-| Mechanical: search/gather/format/rename/bulk transforms | cheap tier preferred | low |
+| Orchestration, design, debugging, root-cause | session model | high/max |
+| Verification, acceptance, adversarial refute | session model — **never weaker than the implementer** | max |
+| Well-specified implementation (machine-checkable acceptance) | one tier down OK | high |
+| Mechanical gather/format/search | cheap tier | low |
 
-**What makes downgrading safe is the safety net, not optimism:**
-- Only downgrade a card whose **acceptance test is machine-checkable** — then a
-  weak executor's failure is caught immediately and cheaply. Vague spec or
-  judgment-laden card -> session model, no exceptions.
-- **Escalation ladder with a ceiling**: acceptance fails once -> retry same
-  executor with the failure output; fails twice -> escalate one model tier up,
-  **capped at the session model** — the top of the ladder is pulling the card
-  back into the main context, not reaching for a stronger model. fable-mode
-  exists to get Fable-5-grade results *without* Fable 5: never spawn a subagent
-  on a model stronger than the session's (that silently burns premium quota).
-  Deferring upward is allowed only with explicit `FABLE_ESCALATION=on`.
-- **The verifier must be at least as strong as the implementer** — verification
-  is what makes everything else safe, so it is never downgraded.
-- When unsure which row a card belongs to, inherit the session model.
+**Safety net — what makes downgrading safe:**
+- Only downgrade cards whose acceptance is **machine-checkable**; vague or judgment-laden cards stay on the session model.
+- Acceptance fails once → retry with the failure output; fails twice → escalate one tier, **capped at the session model** — the top of the ladder is pulling the card back inline, never a stronger model. fable-mode exists to get Fable-5-grade results *without* Fable 5; never spawn above the session model (`FABLE_ESCALATION=on` for genuine upward deferral).
+- When unsure which row a card is, inherit the session model.
 
-## Enforcement layer (ledger-guard hooks)
+## Enforcement layer (hooks — mechanics in `hooks/README.md`)
 
-The six levers above are "discipline by prose" — Claude follows them on its honor. This layer turns the two most easily-shirked ones into Claude Code hooks that actually block (see `hooks/README.md`):
-
-- **Spawn Guard** (PreToolUse Agent/Task/Workflow): when a project has opted in but hasn't written a ledger, **block dispatching a detailed subagent/Workflow** — forcing you through the plan gate (lever 1). It also enforces the **model ceiling mechanically**: any spawn requesting a model stronger than the session's (haiku < sonnet < opus < fable) is blocked — checked on the `model` param and on `model:` literals inside Workflow scripts; unknown models fail open; `FABLE_ESCALATION=on` disables. The session model is cached per-session by the Profile Injector (PreToolUse hooks never receive it).
-- **Close Guard** (Stop): while the ledger still has unchecked items, **block ending the turn** — curing lever 2's "sneaking off before acceptance" and the officially-named "early stopping / spinning."
-- **Profile Injector** (SessionStart): when a project has opted in, **auto-inject the tier by model** (`model` contains fable -> throughput tier, otherwise -> conservative tier; env `FABLE_MODE_PROFILE` overrides) + a reminder of the six levers + "context recovery" of unchecked ledger items. No need to type "use fable mode" — entering a fable-mode project auto-carries the discipline and the right tier.
-
-### `.fable/` is fable-mode's switch directory
-
-The three hooks are registered in the global `settings.json` and fire for **every project, every session**. A switch tells them which projects to be strict about — **whether the project root has a `.fable/` directory** (searched upward from the current dir, bounded at the git root):
-
-- **Has `.fable/`** -> the three hooks take effect (auto-inject tier, block "spawn agent with no ledger", block "end turn before all checked").
-- **No `.fable/`** -> the three hooks pass through silently, as if absent — your other projects are entirely unaffected.
-
-Using "directory present or not" as the opt-in is the dumbest but most reliable way — no env vars or config parsing. **It's also why it doesn't bother you by default**: enforcement only kicks in for a project where you personally created `.fable/`.
-
-**Enable**: at the project root, `mkdir .fable`, and write this round's task cards into `.fable/LEDGER.md` (checkbox state machine):
+Three hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
 
 ```
-- [ ] 1. card (with a machine-checkable acceptance test)
+- [ ] 1. card (machine-checkable acceptance)   <- open: guards enforce
 - [x] 2. done and verified
 - [~] 3. not this round -- deferred: reason
+PAUSED: reason                                 <- a line anywhere: enforcement off
 ```
 
-**Disable**: check every card to `- [x]`/`- [~]`, or just `rm -rf .fable`.
+- **Spawn Guard** (PreToolUse Agent/Task/Workflow): blocks a detailed spawn while no task cards exist (design gate), and blocks any spawn requesting a **model stronger than the session's** (model ceiling — checked on the `model` param and `model:` literals in Workflow scripts; stays active even when paused, it protects quota, not workflow).
+- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain.
+- **Profile Injector** (SessionStart): injects tier + routing + habits, **sized to the ledger state** — full when a round is starting/active, minimal when idle, one line when paused.
 
-`.fable/LEDGER.md` is the enforcement-state snapshot of "what I committed to this round," read by the hooks to decide whether to block; it coexists with the durable `docs/SPEC.md` (design) / `docs/PROGRESS.md` (progress) — the latter two are documents for humans and the next context.
-Exemptions & safety: small spawns (< 1500 chars) and forks are not blocked; loop-safe; fail-open (any hook error passes through — never bricks the session).
-**When doing substantial work with fable-mode, after writing the SPEC in step 2, also `mkdir .fable` and create `.fable/LEDGER.md` to get the mechanical backstop automatically.**
+**Per-task granularity**: *active* (open cards) = full enforcement; *idle* (no/all-closed cards) = quiet, small tasks flow freely; *paused* (PAUSED line) = guards off except the ceiling. Write PAUSED only when the user steers to work unrelated to the round; remove it to resume. Small spawns (<1500 chars) and forks skip the design gate; everything fails open (a guard bug never bricks the session); loop-safe.
+
+**For substantial work: after writing the SPEC, `mkdir .fable` + create `.fable/LEDGER.md` to get the mechanical backstop.**
 
 ## Execution-order template
 
 ```
-1. Restate the goal + scope it (if unclear, ask first; once asked, don't rework requirements)
-2. Write docs/SPEC.md (approach + task cards + per-card acceptance) — the gate; for substantial work also mkdir .fable + create .fable/LEDGER.md to enable enforcement
-3. Execute cards sequentially/in parallel (fresh context + codex exec or subagent)
+1. Restate goal + scope (if unclear ask once; then no requirement rework)
+2. docs/SPEC.md + .fable/LEDGER.md cards — the gate
+3. Execute cards (fresh contexts; Delegation policy)
 4. Per-card acceptance -> update PROGRESS.md
 5. Milestone adversarial self-check (refute or N-approach review)
 6. End-to-end real verification, leave evidence
-7. Wrap up: complete PROGRESS, record gotchas, push if needed
+7. Wrap: PROGRESS complete, lessons recorded, push if asked
 ```
 
 ## Red lines
 
-- No writing code before passing the plan gate (unless the task clearly belongs to the "don't use" list).
-- No substituting "should be fine" for the actual output of an acceptance command.
-- No grinding on in a context stuffed with failed attempts — start fresh.
-- Reporting must be faithful: say failures are failures, say skips are skips.
+- No code before the plan gate (unless the task is in the "don't use" list).
+- No "should be fine" in place of an acceptance command's actual output.
+- No grinding in a failed-attempt-stuffed context — restart fresh.
+- Faithful reporting: failures are failures, skips are skips.

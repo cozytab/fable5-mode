@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """fable-mode Profile Injector  (SessionStart hook).
 
-When a project has opted into fable-mode (`.fable/` dir present), auto-inject
-the fable-mode discipline + the model-appropriate tier at session start, so you
-don't have to type "use fable mode" every time. Also re-surfaces open ledger
-items for context recovery on resume.
+When a project has opted into fable-mode (`.fable/` dir present), inject the
+discipline at session start — sized to the ledger state, so a big project's
+small tasks aren't taxed:
 
-Inert unless a `.fable/` dir is found  ->  keeps fable-mode opt-in at the
-project level while auto-selecting the tier at the model level.
-Fail-open: any error  ->  exit 0 with no output.
+  starting  (.fable/ but no task cards)  -> full injection (guide the round)
+  active    (ledger has open `- [ ]`)    -> full injection + context recovery
+  idle      (all cards closed)           -> minimal one-liner; quick work flows
+  paused    (a `PAUSED` line in ledger)  -> one-liner; enforcement off except
+                                            the model ceiling
 
-Tier selection (env FABLE_MODE_PROFILE overrides: auto|conservative|throughput):
-  model contains "fable"  ->  throughput (aggressive parallel delegation)
-  otherwise / model absent ->  conservative (<=5 concurrent, inline-first)
+Also caches {session_id -> model} so the spawn guard can enforce the model
+ceiling (PreToolUse hooks never receive `model`).
 
-Graceful degradation: a conservative (non-Fable) session also gets a
-"don't defer to a stronger model, don't stall" instruction, so work never gets
-stuck waiting for a Fable 5 the user can't run. Set FABLE_ESCALATION=on to opt
-out (you genuinely have a stronger tier available).
+Inert unless `.fable/` is found. Fail-open: any error -> exit 0, no output.
+Tier: model contains "fable" -> throughput, else conservative
+(env FABLE_MODE_PROFILE=auto|conservative|throughput overrides).
+FABLE_ESCALATION=on marks a stronger tier as genuinely available.
 """
 import json
 import os
@@ -42,75 +42,78 @@ def choose_profile(model):
     return "throughput" if "fable" in (model or "").lower() else "conservative"
 
 
-def build_context(profile, model, fable_dir):
+def build_context(profile, model, ledger_state, open_items):
     m = model or "unknown"
+
+    if ledger_state == "paused":
+        return (
+            "[fable-mode] Round PAUSED (.fable/LEDGER.md has a PAUSED line): "
+            "enforcement is off except the model ceiling (never spawn above "
+            "this session's model). Remove the PAUSED line to resume the round."
+        )
+
+    if ledger_state == "idle":
+        return (
+            "[fable-mode] Project armed, ledger idle — quick tasks flow "
+            "freely, no process tax. For the next substantial task, follow "
+            "%s: SPEC + task cards in .fable/LEDGER.md first. Always: audit "
+            "every progress claim against a tool result; don't end the turn "
+            "on an actionable promise; lead with the outcome. Never spawn a "
+            "subagent above this session's model." % SKILL
+        )
+
+    # starting / active -> full injection
     if profile == "throughput":
         tier = (
             "Current model %s -> THROUGHPUT tier: delegate parallel subagents "
             "aggressively, communicate async (don't block on each return); "
             "still enforce ledger-before-delegation and staged fresh-eyes "
-            "verification. The cost (~15x tokens / rate limits) is known and "
-            "accepted." % m
+            "verification. Cost (~15x tokens / rate limits) is accepted." % m
         )
     else:
         tier = (
             "Current model %s -> CONSERVATIVE tier: cap concurrency at 5, "
-            "inline-first, don't split unless it clearly helps, quality first; "
-            "if unsure whether delegation preserves quality, do it yourself." % m
+            "inline-first, don't split unless it clearly helps; if unsure "
+            "delegation preserves quality, do it yourself." % m
         )
-    routing = (
-        "Model routing (capability-matched): design/debugging/verification/"
-        "acceptance judging stay on this session's model; a well-specified "
-        "implementation card with machine-checkable acceptance may drop one "
-        "model tier; mechanical gather/format/search may go to a cheap tier at "
-        "low effort. Safety net: only downgrade cards whose acceptance is "
-        "machine-checkable; acceptance failed twice -> escalate the model tier "
-        "CAPPED AT this session's model (the top of the ladder is pulling the "
-        "card back inline, never a stronger model — do not spawn subagents "
-        "above the session model); the verifier must be at least as strong "
-        "as the implementer. When unsure, inherit the session model."
-    )
 
     lines = [
         "[fable-mode] This project has fable-mode enabled (.fable/ detected). "
         "Follow the six levers in %s." % SKILL,
         tier,
-        routing,
-        "Design gate: before writing code, produce docs/SPEC.md (requirements + "
-        "approach + task cards, each with a machine-checkable acceptance test), "
-        "and record this round's committed cards in .fable/LEDGER.md (checkbox "
-        "state machine - [ ]/- [x]/- [~]). The guard hooks block 'spawning an "
-        "agent with no ledger' and 'ending the turn with unchecked ledger items'.",
-        "Fable-5 habits (all models): (1) audit every progress claim against a "
-        "tool result before reporting it — unverified means say 'unverified'; "
-        "(2) before ending the turn, check your last paragraph — if it's a "
-        "plan/promise/next-steps you could act on, act now with tool calls; "
-        "(3) lead with the outcome; be selective, not compressed.",
+        "Model routing: design/debugging/verification stay on this session's "
+        "model; a well-specified implementation card (machine-checkable "
+        "acceptance) may drop one tier; mechanical work goes cheap at low "
+        "effort. Two failed acceptances -> escalate, CAPPED AT this session's "
+        "model (top of the ladder is pulling the card back inline — never "
+        "spawn above the session model); the verifier must be at least as "
+        "strong as the implementer. When unsure, inherit the session model.",
+        "Design gate: docs/SPEC.md (requirements + approach + task cards, "
+        "each with machine-checkable acceptance) and cards in "
+        ".fable/LEDGER.md (- [ ]/- [x]/- [~]; a PAUSED line suspends "
+        "enforcement for unrelated work). Guards block spawning without "
+        "cards and stopping with open cards.",
+        "Fable-5 habits: (1) audit every progress claim against a tool "
+        "result — unverified means say 'unverified'; (2) don't end the turn "
+        "on an actionable plan/promise — act now; (3) lead with the outcome; "
+        "be selective, not compressed.",
     ]
 
-    # Graceful degradation: a non-Fable session assumes no stronger tier to
-    # defer to, so tell the model to never stall/hand off. FABLE_ESCALATION=on
-    # opts back in (you genuinely have a stronger model available).
     if profile == "conservative" and \
             os.environ.get("FABLE_ESCALATION", "auto").lower() != "on":
         lines.append(
-            "No stronger model is assumed available this session: do NOT defer "
-            "hard steps to Fable 5 or stall waiting for a model you can't run. "
-            "Instead decompose the hard part into smaller verifiable steps, use "
-            "best-of-N + a judge, make tools/tests the ground truth, and flag "
-            "residual risk instead of blocking. (Set FABLE_ESCALATION=on if you "
-            "do have a stronger tier to defer to.)"
+            "No stronger model is assumed available: do NOT defer hard steps "
+            "to Fable 5 or stall for a model you can't run — decompose into "
+            "verifiable steps, best-of-N + judge, tools/tests as ground "
+            "truth, flag residual risk instead of blocking. "
+            "(FABLE_ESCALATION=on if a stronger tier truly exists.)"
         )
 
-    # Context recovery: surface open ledger items on (re)start.
-    try:
-        open_items, _ = parse_ledger(ledger_path(fable_dir))
-    except Exception:
-        open_items = []
     if open_items:
         shown = open_items[:MAX_LIST]
         more = len(open_items) - len(shown)
-        recap = "Context recovery: the ledger still has %d open item(s):\n" % len(open_items)
+        recap = ("Context recovery: the ledger still has %d open item(s):\n"
+                 % len(open_items))
         recap += "\n".join("  " + it for it in shown)
         if more > 0:
             recap += "\n  ... and %d more" % more
@@ -128,8 +131,18 @@ def main():
     if not fable_dir:
         return 0  # not opted in -> stay silent (preserve on-demand)
 
+    open_items, has_any, paused = parse_ledger(ledger_path(fable_dir))
+    if paused:
+        state = "paused"
+    elif open_items:
+        state = "active"
+    elif has_any:
+        state = "idle"
+    else:
+        state = "starting"
+
     profile = choose_profile(data.get("model"))
-    context = build_context(profile, data.get("model"), fable_dir)
+    context = build_context(profile, data.get("model"), state, open_items)
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",

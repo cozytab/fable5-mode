@@ -2,6 +2,8 @@
 
 State machine: `- [ ]` open (blocks turn-end) · `- [x]` done AND verified ·
 `- [~] ... -- deferred: reason` consciously out of this round.
+A line `PAUSED: reason` anywhere suspends enforcement (for user-steered work
+unrelated to this round) — the model ceiling stays active; remove to resume.
 
 Only mark `- [x]` after the acceptance command actually ran — cite evidence:
 

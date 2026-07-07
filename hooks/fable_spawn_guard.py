@@ -114,7 +114,9 @@ def main():
     if payload_len(tool_name, tool_input) < threshold:
         return 0  # small delegation -> exempt
 
-    _open, has_any = parse_ledger(ledger_path(fable_dir))
+    _open, has_any, paused = parse_ledger(ledger_path(fable_dir))
+    if paused:
+        return 0  # round paused -> design gate off (ceiling stayed active above)
     if has_any:
         return 0  # ledger exists with task cards -> allowed
 

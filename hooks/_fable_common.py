@@ -121,18 +121,24 @@ def load_session_model(session_id):
 
 
 def parse_ledger(path):
-    """Return (open_items, has_any) for a ledger file.
+    """Return (open_items, has_any, paused) for a ledger file.
 
     A ledger line is a markdown checkbox: `- [ ] ...`, `- [x] ...`, `- [~] ...`
     (case-insensitive on x). `open_items` is the list of `- [ ]` line texts.
     `has_any` is True if the file has at least one checkbox line at all.
+    `paused` is True if any line starts with `PAUSED` (case-insensitive) —
+    the user-facing switch to suspend enforcement mid-round for unrelated work.
     """
     open_items = []
     has_any = False
+    paused = False
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 s = line.strip()
+                if s.upper().startswith("PAUSED"):
+                    paused = True
+                    continue
                 if len(s) < 4 or not s.startswith("- ["):
                     continue
                 mark = s[3:4].lower()
@@ -142,8 +148,8 @@ def parse_ledger(path):
                 elif mark in ("x", "~"):
                     has_any = True
     except FileNotFoundError:
-        return [], False
+        return [], False, False
     except Exception:
         # Unreadable ledger: treat as "no ledger" -> fail open.
-        return [], False
-    return open_items, has_any
+        return [], False, False
+    return open_items, has_any, paused

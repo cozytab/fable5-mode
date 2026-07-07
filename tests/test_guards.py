@@ -160,6 +160,22 @@ d = proj(git=True)
 check("ceiling/no-fable-inert", run_env(SPAWN, {"cwd": d, "session_id": "fbtest-ceil-opus",
       "tool_name": "Agent", "tool_input": {"prompt": SMALL, "model": "fable"}}), 0)
 
+# ---- PAUSED semantics ----
+# a. open card + PAUSED -> close guard allows stop
+d = proj(with_fable=True, git=True, ledger="- [ ] 1. big card\nPAUSED: side work\n")
+check("paused/close-allows", run(CLOSE, {"cwd": d}), 0)
+
+# b. PAUSED with no cards -> spawn design gate off (big payload allowed)
+d = proj(with_fable=True, git=True, ledger="PAUSED: side work\n")
+check("paused/spawn-gate-off", run(SPAWN, {"cwd": d, "tool_name": "Agent",
+      "tool_input": {"prompt": BIG}}), 0)
+
+# c. PAUSED does NOT disable the model ceiling (quota protection stays)
+d = proj(with_fable=True, git=True, ledger="- [ ] 1. card\nPAUSED: side work\n")
+check("paused/ceiling-still-blocks", run_env(SPAWN, {"cwd": d,
+      "session_id": "fbtest-ceil-opus", "tool_name": "Agent",
+      "tool_input": {"prompt": SMALL, "model": "fable"}}), 2)
+
 for d in tmps:
     shutil.rmtree(d, ignore_errors=True)
 

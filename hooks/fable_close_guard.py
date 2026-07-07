@@ -37,7 +37,9 @@ def main():
     if not os.path.isfile(path):
         return 0  # no ledger -> nothing to enforce
 
-    open_items, _has_any = parse_ledger(path)
+    open_items, _has_any, paused = parse_ledger(path)
+    if paused:
+        return 0  # round paused -> enforcement off
     if not open_items:
         return 0  # all closed -> allow stop
 
