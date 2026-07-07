@@ -113,15 +113,17 @@ rc, out = run({"cwd": d, "model": "claude-fable-5"})
 c = ctx(out)
 check("inject/habits-throughput", rc == 0 and c and "Fable-5 habits" in c)
 
-# 15/16. model parity: both tiers say subagents inherit the session model
+# 15/16. capability-matched routing injected on both tiers, with safety net
 d = proj(with_fable=True)
 rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
 c = ctx(out)
-check("inject/model-parity-conservative", rc == 0 and c and "inherit this session's model" in c)
+check("inject/routing-conservative", rc == 0 and c and "Model routing" in c
+      and "escalate the model tier" in c and "verifier must be at least as strong" in c)
 d = proj(with_fable=True)
 rc, out = run({"cwd": d, "model": "claude-fable-5"})
 c = ctx(out)
-check("inject/model-parity-throughput", rc == 0 and c and "inherit this session's model" in c and "cheaper tiers" not in c)
+check("inject/routing-throughput", rc == 0 and c and "Model routing" in c
+      and "When unsure, inherit the session model" in c)
 
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))

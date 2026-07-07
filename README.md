@@ -201,12 +201,16 @@ fable-mode's concurrency isn't a fixed number.
 The Profile Injector picks the tier automatically by model
 (`FABLE_MODE_PROFILE=auto|conservative|throughput` overrides).
 
-**Model parity**: on either tier, subagents inherit the session's model —
-fable-mode never silently downgrades a subagent. Solving the problem outranks
-saving tokens; a weak subagent that flails costs more than it saves. Downgrading
-is a narrow, explicit exception for trivially mechanical, machine-checkable
-subtasks only — never design, non-trivial implementation, debugging, or
-verification.
+**Model routing (capability-matched)**: neither "never downgrade" nor "offload
+to cheap" is right. fable-mode routes by what the card demands — design,
+debugging and **all verification** stay on the session model; a well-specified
+implementation card may drop one tier; mechanical gather/format work goes to a
+cheap tier at low effort. This mirrors Anthropic's own practice (Opus-class lead
++ Sonnet-class subagents in their research system, +90.2% over single-agent).
+What makes downgrading safe is the safety net: only cards with machine-checkable
+acceptance are downgraded, two failed acceptances escalate the model tier, and
+the verifier is always at least as strong as the implementer. When unsure,
+inherit the session model.
 
 ## The Fable 5 habit set
 
@@ -215,8 +219,7 @@ documents for Fable 5 — so any model in a fable-mode project inherits them:
 ground every progress claim in a tool result; never end a turn on a promise you
 could act on; lead with the outcome; pause only where the user is genuinely
 needed; assessment before action; fresh-context verifiers over self-critique;
-effort routed by task (max = judge, high = build, low = gather — effort, never
-a weaker model); pass the *why*
+model & effort routed by task (verification never downgraded); pass the *why*
 along when delegating; keep a lessons file. The three highest-value habits are
 auto-injected into every fable-mode session by the Profile Injector.
 

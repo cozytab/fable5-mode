@@ -48,23 +48,31 @@ def build_context(profile, model, fable_dir):
             "Current model %s -> THROUGHPUT tier: delegate parallel subagents "
             "aggressively, communicate async (don't block on each return); "
             "still enforce ledger-before-delegation and staged fresh-eyes "
-            "verification. Subagents inherit this session's model — do NOT "
-            "downgrade them (solving the problem outranks saving tokens; "
-            "downgrade only trivially-mechanical, machine-checkable subtasks). "
-            "The cost (~15x tokens / rate limits) is known and accepted." % m
+            "verification. The cost (~15x tokens / rate limits) is known and "
+            "accepted." % m
         )
     else:
         tier = (
             "Current model %s -> CONSERVATIVE tier: cap concurrency at 5, "
             "inline-first, don't split unless it clearly helps, quality first; "
-            "if unsure whether delegation preserves quality, do it yourself. "
-            "Subagents inherit this session's model — never a weaker one." % m
+            "if unsure whether delegation preserves quality, do it yourself." % m
         )
+    routing = (
+        "Model routing (capability-matched): design/debugging/verification/"
+        "acceptance judging stay on this session's model; a well-specified "
+        "implementation card with machine-checkable acceptance may drop one "
+        "model tier; mechanical gather/format/search may go to a cheap tier at "
+        "low effort. Safety net: only downgrade cards whose acceptance is "
+        "machine-checkable; acceptance failed twice -> escalate the model tier "
+        "or pull the card back inline; the verifier must be at least as strong "
+        "as the implementer. When unsure, inherit the session model."
+    )
 
     lines = [
         "[fable-mode] This project has fable-mode enabled (.fable/ detected). "
         "Follow the six levers in %s." % SKILL,
         tier,
+        routing,
         "Design gate: before writing code, produce docs/SPEC.md (requirements + "
         "approach + task cards, each with a machine-checkable acceptance test), "
         "and record this round's committed cards in .fable/LEDGER.md (checkbox "

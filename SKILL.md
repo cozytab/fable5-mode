@@ -67,7 +67,7 @@ A weak model's biggest failure mode is "thinking while typing, changing its mind
 
 ### 2. Small-card execution + per-card acceptance
 - Execute each card in a **fresh context** (subagent or codex exec), feeding only the relevant SPEC excerpt + that card's description — no reasoning garbage from prior cards.
-- **Model parity rule**: subagents inherit the **same model as the main session** by default — never silently hand a card to a weaker model. Solving the problem outranks saving tokens; a weak subagent that flails costs more than it saves. Route **effort** per spawn (**max** = judgment/verification/acceptance, **high** = implementation, **low** = mechanical gathering) — effort is thinking budget on the *same* model, not permission to downgrade it.
+- **Route model & effort per card** (see "Model & effort routing" below): judgment/design/debugging/verification stay on the session model; a well-specified implementation card may drop one tier; mechanical work may drop further. What makes this safe is the acceptance test — a weak executor's failure is caught immediately and cheaply. When unsure, inherit the session model.
 - Run the card's acceptance command the moment it's done; **do not advance until it passes**. On 2 failures, escalate back to the main context to crack it, rather than letting the executor flail.
 - Parallel cards fan out via Agent/Workflow; for concurrency see "Concurrency tiers" below — default to the **conservative tier (<=5 concurrent)**, and open the **throughput tier** only when the user explicitly asks.
 
@@ -117,10 +117,10 @@ them, on any model:
    work with a separate fresh-context pass (subagent or re-read after a reset)
    against the SPEC — the generator should not be the only judge
    (see `templates/VERIFIER_PROMPT.md`).
-7. **Route effort per task**: max for judgment/verification/acceptance, high
-   for implementation, low for mechanical gathering. Effort is thinking budget
-   on the **same model** — not permission to hand the card to a weaker model.
-   Never downgrade critical output or adversarial checks.
+7. **Route model & effort per task** (two separate dials — see "Model & effort
+   routing"): judgment/verification/design stay on the session model at max/high
+   effort; well-specified implementation may drop one model tier; mechanical
+   gathering goes cheap at low effort. Verification is never downgraded.
 8. **Give the reason, not only the request.** When delegating, pass why the
    task matters and what the output enables — intent travels with the card.
 9. **Keep a lessons file.** Record corrections and confirmed approaches (one
@@ -143,10 +143,37 @@ fable-mode's concurrency is not a fixed number — pick a tier by the task. **De
   - Hard structural limit: **subagents are only one level deep — they can't spawn subagents** (Workflow nesting is also one level).
   - Tell the user the cost honestly: an orchestrator+parallel architecture can improve on a single agent by ~**90%**, but burns ~**15x tokens**, and higher concurrency is likelier to hit API rate limits.
 - **Local implementation**: opening up concurrency is not running naked — you must still have (1) async non-blocking (the orchestrator keeps working after dispatching, doesn't await each one), (2) per-segment verification, (3) a watchdog, (4) resumable checkpoints. Web-scraping subagents still obey the red line: `curl --max-time`, not WebFetch.
-- **Model parity still holds**: even at high fan-out, subagents inherit the session model by default. Downgrade routing is a **narrow, explicit exception** — only for trivially mechanical subtasks (gather/format/rename) whose output is machine-checkable, never for anything on the problem-solving path: design, non-trivial implementation, debugging, or verification. **Critical output and adversarial self-check must never be downgraded.** When in doubt, don't downgrade.
+- **Routing still holds at high fan-out** (see "Model & effort routing"): the lead and all verification stay on the session model; well-specified implementation may drop one tier; mechanical work goes cheap. High fan-out makes the escalation ladder *more* important, not less — every downgraded card needs its machine-checkable acceptance, and two failures escalate the tier.
 
 ### Pick-a-tier in one line
 When unsure, use the conservative tier and tell the user "for more speed you can enable the throughput tier, at the cost of ~15x tokens + rate-limit risk"; let the user decide — don't burn money by default.
+
+## Model & effort routing (capability-matched, safety-netted)
+
+Neither blanket rule is right: "never downgrade" wastes money on work a smaller
+model does equally well; "offload to cheap" hands problem-solving to models that
+can't solve them. Route by what the card actually demands — this mirrors
+Anthropic's own practice (their research system runs an Opus-class lead with
+Sonnet-class subagents, +90.2% over single-agent; Claude Code's Explore agent
+runs on Haiku by default; subagents inherit the session model when unsure).
+
+| Card type | Model | Effort |
+|---|---|---|
+| Orchestration, design, architecture choice, debugging, root-cause | **session model** (the lead never downgrades) | high/max |
+| Verification, acceptance judging, adversarial refute | **session model** | max |
+| Implementation of a **well-specified** card (tight spec + machine-checkable acceptance) | one tier down is fine | high |
+| Mechanical: search/gather/format/rename/bulk transforms | cheap tier preferred | low |
+
+**What makes downgrading safe is the safety net, not optimism:**
+- Only downgrade a card whose **acceptance test is machine-checkable** — then a
+  weak executor's failure is caught immediately and cheaply. Vague spec or
+  judgment-laden card -> session model, no exceptions.
+- **Escalation ladder**: acceptance fails once -> retry same executor with the
+  failure output; fails twice -> escalate one model tier up (or pull back into
+  the main context). Never let a downgraded executor grind.
+- **The verifier must be at least as strong as the implementer** — verification
+  is what makes everything else safe, so it is never downgraded.
+- When unsure which row a card belongs to, inherit the session model.
 
 ## Enforcement layer (ledger-guard hooks)
 
