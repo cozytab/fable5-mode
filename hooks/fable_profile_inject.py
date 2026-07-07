@@ -65,6 +65,11 @@ def build_context(profile, model, fable_dir):
         "and record this round's committed cards in .fable/LEDGER.md (checkbox "
         "state machine - [ ]/- [x]/- [~]). The guard hooks block 'spawning an "
         "agent with no ledger' and 'ending the turn with unchecked ledger items'.",
+        "Fable-5 habits (all models): (1) audit every progress claim against a "
+        "tool result before reporting it — unverified means say 'unverified'; "
+        "(2) before ending the turn, check your last paragraph — if it's a "
+        "plan/promise/next-steps you could act on, act now with tool calls; "
+        "(3) lead with the outcome; be selective, not compressed.",
     ]
 
     # Graceful degradation: a non-Fable session assumes no stronger tier to

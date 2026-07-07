@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 # a project's working ledger is local state, never published
 .fable/
+# design docs & progress are local working files, not published
+docs/

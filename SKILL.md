@@ -56,7 +56,7 @@ stronger tier to defer to.
 ## The six levers (execute in order)
 
 ### 1. Plan Gate
-Before writing code, produce `docs/SPEC.md`: requirements, approach, **task-card list**. Each card:
+Before writing code, produce `docs/SPEC.md`: requirements, approach, **task-card list** (starter skeletons in `templates/`). Each card:
 - granularity <= what one fresh context can hold (rule of thumb: <= 5 files / <= 300 lines per card);
 - must state a **machine-checkable acceptance test** (command, expected output, screenshot points) — "looks right" is not acceptance;
 - annotate cross-card dependencies; mark cards that can run in parallel.
@@ -66,7 +66,7 @@ A weak model's biggest failure mode is "thinking while typing, changing its mind
 **Choice of executor is Claude's own judgment, not a hard rule.** Subagent, Workflow, an external executor (e.g. codex exec), or doing it yourself — decide per card by the nature of the work / quality bar / quota level. Quality first; when in doubt, don't split — if you have any doubt that splitting preserves quality, do it yourself. **An external executor is one option, not this protocol's default.**
 
 ### 2. Small-card execution + per-card acceptance
-- Execute each card in a **fresh context** (subagent or codex exec), feeding only the relevant SPEC excerpt + that card's description — no reasoning garbage from prior cards.
+- Execute each card in a **fresh context** (subagent or codex exec), feeding only the relevant SPEC excerpt + that card's description — no reasoning garbage from prior cards. Route effort per spawn: **max** = judgment/verification/acceptance, **high** = implementation, **low** = mechanical gathering.
 - Run the card's acceptance command the moment it's done; **do not advance until it passes**. On 2 failures, escalate back to the main context to crack it, rather than letting the executor flail.
 - Parallel cards fan out via Agent/Workflow; for concurrency see "Concurrency tiers" below — default to the **conservative tier (<=5 concurrent)**, and open the **throughput tier** only when the user explicitly asks.
 
@@ -88,6 +88,42 @@ All-green static checks != it works. Every milestone must run the real product e
 - Background long tasks must have a **watchdog**: monitor output-file mtime and wake up to handle it if nothing moves past a threshold — never let it hang silently overnight.
 - Organize work to be resumable (Workflow resume / codex exec in batches / task cards are natural checkpoints); if any step dies, you lose at most one card.
 - Batch dispatch obeys the current concurrency tier (see "Concurrency tiers"); regardless of tier, what's forbidden is **"brainless fan-out"** (a one-shot spray with no verification, no watchdog, no checkpoints), not parallelism itself. The throughput tier still requires async communication + staged verification as a backstop.
+
+## The Fable 5 habit set (emulate these)
+
+Distilled from Anthropic's official Fable 5 prompting guidance — the concrete
+behaviors that separate frontier output from weaker-model output. Adopt all of
+them, on any model:
+
+1. **Ground every progress claim.** Before reporting progress, audit each claim
+   against a tool result from this session. Only report work you can point to
+   evidence for; if something isn't verified yet, say so explicitly.
+2. **Never end on a promise.** Before ending your turn, check your last
+   paragraph: if it is a plan, an analysis, a question you could answer, a list
+   of next steps, or "I'll now do X" — do that work now with tool calls. End
+   only when the task is complete or blocked on input only the user has.
+3. **Lead with the outcome.** Your first sentence answers "what happened / what
+   did you find." Keep output short by being selective about what to include,
+   not by compressing into fragments or arrow-chains.
+4. **Pause only where the user is genuinely needed**: a destructive or
+   irreversible action, a real scope change, or input only they can provide.
+   Otherwise proceed.
+5. **Assessment vs. action.** When the user describes a problem or thinks out
+   loud, the deliverable is your assessment — report findings and stop; don't
+   apply fixes unasked. Before any state-changing command, check the evidence
+   actually supports that specific action.
+6. **Fresh-context verifiers beat self-critique.** At intervals, verify your
+   work with a separate fresh-context pass (subagent or re-read after a reset)
+   against the SPEC — the generator should not be the only judge
+   (see `templates/VERIFIER_PROMPT.md`).
+7. **Route effort per task**: max for judgment/verification/acceptance, high
+   for implementation, low for mechanical gathering. Never downgrade critical
+   output or adversarial checks.
+8. **Give the reason, not only the request.** When delegating, pass why the
+   task matters and what the output enables — intent travels with the card.
+9. **Keep a lessons file.** Record corrections and confirmed approaches (one
+   lesson per entry, with why); update rather than duplicate; delete lessons
+   that turn out wrong. PROGRESS.md's "gotchas" section is the minimum form.
 
 ## Concurrency tiers (conservative / throughput)
 

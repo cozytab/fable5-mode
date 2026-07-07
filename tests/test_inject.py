@@ -101,6 +101,18 @@ rc, out = run({"cwd": d, "model": "claude-opus-4-8"}, env={"FABLE_ESCALATION": "
 c = ctx(out)
 check("inject/escalation-on-suppresses", rc == 0 and c and "CONSERVATIVE" in c and "do NOT defer" not in c)
 
+# 13. Fable-5 habits injected on conservative tier
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/habits-conservative", rc == 0 and c and "Fable-5 habits" in c and "audit every progress claim" in c)
+
+# 14. Fable-5 habits injected on throughput tier too (universal)
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-fable-5"})
+c = ctx(out)
+check("inject/habits-throughput", rc == 0 and c and "Fable-5 habits" in c)
+
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

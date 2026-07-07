@@ -181,6 +181,22 @@ fable-mode 的并发不是一个死数字。
 Profile Injector 会按模型自动选档（`FABLE_MODE_PROFILE=auto|conservative|throughput`
 可覆盖）。
 
+## Fable 5 习惯集
+
+在六大杠杆之外，skill 还移植了 Anthropic 官方文档里 Fable 5 的具体行为——让任何
+模型进了 fable-mode 项目都继承它们：每条进度汇报先对照工具结果再说；回合绝不停在
+一句"我接下来会…"上（能做就当场做掉）；结论先行；只在真正需要用户时才暂停；先评估
+再动手；新鲜上下文的验证者优于自我检查；按任务路由 effort（max=评审、high=实现、
+low=收集）；派活时把"为什么"一起传下去；维护一份教训文件。其中价值最高的三条习惯
+由 Profile Injector 自动注入每个 fable-mode 会话。
+
+起步骨架在 [`templates/`](templates/)——SPEC、LEDGER、PROGRESS，以及引擎中立的
+新鲜视角[验证者提示词](templates/VERIFIER_PROMPT.md)。
+
+**为什么是 skill + hooks，而不是插件或 Agent？** 改成插件只增加分发便利、不增加
+任何强制能力，而我们不发布无法端到端验证的形态；"Agent"只能建议、不能拦截。当前
+形态一条 clone + 一个脚本装完、且在真机验证过。插件化是"暂缓"，不是"否决"。
+
 ## 没有更强的模型？它会降级，绝不卡住
 
 fable-mode 对能力墙很诚实——但"换 Fable 5"对跑不了 Fable 5 的人就是死路。所以
@@ -197,6 +213,7 @@ fable-mode/
 ├── README.md             # English
 ├── README.zh-CN.md       # 本文件
 ├── install.sh            # 合并/移除 settings.json 里的 hook（自解析路径、幂等）
+├── templates/            # SPEC / LEDGER / PROGRESS 骨架 + 新鲜视角验证者提示词
 ├── hooks/
 │   ├── README.md         # hook 机制、账本格式、安装
 │   ├── _fable_common.py  # 共用工具（读 stdin、向上找 .fable/、解析账本）

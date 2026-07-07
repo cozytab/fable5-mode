@@ -59,9 +59,10 @@ d = proj(with_fable=True, git=True)
 check("spawn/fork-exempt", run(SPAWN, {"cwd": d, "tool_name": "Agent",
       "tool_input": {"prompt": BIG, "subagent_type": "fork"}}), 0)
 
-# 6. malformed stdin -> fail-open allow
+# 6. malformed stdin -> fail-open allow (cwd isolated: the hook falls back to
+# process cwd, which must not accidentally sit inside a .fable project)
 p = subprocess.run([sys.executable, SPAWN], input="not json{{",
-                   capture_output=True, text=True)
+                   capture_output=True, text=True, cwd=proj(git=True))
 check("spawn/malformed-failopen", p.returncode, 0)
 
 # 7. git-root boundary: .fable is ABOVE a git root -> should NOT arm inner proj
@@ -92,8 +93,9 @@ check("close/loop-safety", run(CLOSE, {"cwd": d, "stop_hook_active": True}), 0)
 d = proj(with_fable=True, git=True)
 check("close/no-ledger-file", run(CLOSE, {"cwd": d}), 0)
 
-# 6. malformed -> allow
-p = subprocess.run([sys.executable, CLOSE], input="}{bad", capture_output=True, text=True)
+# 6. malformed -> allow (cwd isolated, same reason as spawn test 6)
+p = subprocess.run([sys.executable, CLOSE], input="}{bad", capture_output=True,
+                   text=True, cwd=proj(git=True))
 check("close/malformed-failopen", p.returncode, 0)
 
 for d in tmps:

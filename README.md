@@ -201,6 +201,26 @@ fable-mode's concurrency isn't a fixed number.
 The Profile Injector picks the tier automatically by model
 (`FABLE_MODE_PROFILE=auto|conservative|throughput` overrides).
 
+## The Fable 5 habit set
+
+Beyond the six levers, the skill transplants the concrete behaviors Anthropic
+documents for Fable 5 — so any model in a fable-mode project inherits them:
+ground every progress claim in a tool result; never end a turn on a promise you
+could act on; lead with the outcome; pause only where the user is genuinely
+needed; assessment before action; fresh-context verifiers over self-critique;
+effort routed by task (max = judge, high = build, low = gather); pass the *why*
+along when delegating; keep a lessons file. The three highest-value habits are
+auto-injected into every fable-mode session by the Profile Injector.
+
+Starter skeletons live in [`templates/`](templates/) — SPEC, LEDGER, PROGRESS,
+and an engine-neutral fresh-eyes [verifier prompt](templates/VERIFIER_PROMPT.md).
+
+**Why a skill + hooks, not a plugin or agent?** A plugin restructure would add
+distribution convenience but no new enforcement capability, and we don't ship
+forms we can't verify end-to-end; an "agent" can only advise, not block. The
+current form installs with one clone + one script and is verified on a real
+machine. Plugin packaging is deferred, not rejected.
+
 ## No stronger model? It degrades, never stalls
 
 fable-mode is honest about capability walls — but "switch to Fable 5" is a dead
@@ -219,6 +239,7 @@ fable-mode/
 ├── README.md             # this file
 ├── README.zh-CN.md       # 简体中文
 ├── install.sh            # merge/remove the hooks in settings.json (path-resolving, idempotent)
+├── templates/            # SPEC / LEDGER / PROGRESS skeletons + fresh-eyes verifier prompt
 ├── hooks/
 │   ├── README.md         # hook mechanics, ledger format, install
 │   ├── _fable_common.py  # shared helpers (stdin, upward .fable/ search, ledger parse)
