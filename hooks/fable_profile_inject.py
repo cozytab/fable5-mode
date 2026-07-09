@@ -91,12 +91,21 @@ def build_context(profile, model, ledger_state, open_items):
         "Design gate: docs/SPEC.md (requirements + approach + task cards, "
         "each with machine-checkable acceptance) and cards in "
         ".fable/LEDGER.md (- [ ]/- [x]/- [~]; a PAUSED line suspends "
-        "enforcement for unrelated work). Guards block spawning without "
-        "cards and stopping with open cards.",
+        "enforcement for unrelated work). Before designing, close the "
+        "load-bearing unknowns with targeted probes; tag SPEC decisions "
+        "[measured]/[inferred]/[not-shown]. Guards block spawning without "
+        "cards, stopping with open cards, and checking a card `- [x]` "
+        "without an `-- evidence:` note.",
         "Fable-5 habits: (1) audit every progress claim against a tool "
         "result — unverified means say 'unverified'; (2) don't end the turn "
         "on an actionable plan/promise — act now; (3) lead with the outcome; "
-        "be selective, not compressed.",
+        "be selective, not compressed; (4) desk-check before first run "
+        "(re-derive key constants from source evidence); (5) on repeated "
+        "failure walk the attribution ladder: harness -> deployment -> "
+        "product, then fix the class via an invariant; (6) if the product "
+        "can't be driven end-to-end, add a deterministic test hook and "
+        "drive it — testability is a product feature; (7) declare workflow "
+        "deviations in one line, never silently comply or deviate.",
     ]
 
     if profile == "conservative" and \

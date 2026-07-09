@@ -79,14 +79,20 @@ The full protocol lives in **[`SKILL.md`](SKILL.md)** — the text Claude actual
 
 ## The enforcement layer (the part that's more than a prompt)
 
-Six levers written as prose still rely on the model's honor. Three hooks turn the
+Six levers written as prose still rely on the model's honor. Four hooks turn the
 most-shirked rules into hard blocks:
 
 | Hook | Event | Effect |
 |---|---|---|
 | **Profile Injector** | `SessionStart` | Auto-injects the discipline, **sized to the ledger state** — full during an active round, a one-liner when idle or paused — plus the model-appropriate tier and open-item recovery. |
 | **Spawn Guard** | `PreToolUse` (Agent/Task/Workflow) | Blocks a detailed spawn before a ledger exists (forces the plan gate), and blocks any spawn requesting a model **stronger than the session's** — the model ceiling is mechanical, not just prose. |
-| **Close Guard** | `Stop` | Blocks ending the turn while the ledger still has unchecked items — cures early stopping / spinning. |
+| **Fail-Streak Reminder** | `PostToolUse` (Bash) | Advisory, never blocks: at every 3rd consecutive failing command it injects the **attribution ladder** (suspect the harness → prove the new code is running → only then debug the product, and fix the class via an invariant) — cures grinding on the wrong layer. |
+| **Close Guard** | `Stop` | Blocks ending the turn while the ledger still has unchecked items — cures early stopping / spinning. Also enforces **evidence-on-close**: a `- [x]` card without an `-- evidence:` note blocks the stop ("report evidence, not adjectives" as a hard rule). |
+
+Plus **`hooks/fable_lint.py`** — not a hook but a one-shot CLI: checks the SPEC
+carries `[measured]/[inferred]/[not-shown]` source tags, every open card names
+its acceptance, every closed card carries evidence. Run it at wrap-up (or in CI):
+`python3 hooks/fable_lint.py <project_dir>`.
 
 Design properties that make this safe to register globally:
 

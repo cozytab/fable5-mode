@@ -43,20 +43,38 @@ Never stall, hand off, or end the turn waiting for a model you can't run:
 ### 1. Plan Gate
 Before code, write `docs/SPEC.md`: requirements, approach, **task cards** (skeletons in `templates/`). Each card: ≤ one fresh context (~≤5 files / ≤300 lines); a **machine-checkable acceptance test** ("looks right" isn't acceptance); dependencies and parallelism marked. Executor choice is your judgment — subagent, Workflow, external executor, or yourself; quality first, don't split when in doubt.
 
+**Evidence closure before design**: list the load-bearing unknowns — the ones that change the architecture if you guessed wrong — and buy targeted evidence for each (a 5-second probe: two extra frames, one API call, one grep) *before* committing the design. Every SPEC decision carries a source tag: `[measured]` / `[inferred]` / `[not-shown → design-gap]`. Guessed foundations are how one-pass code dies; tagged assumptions are how reviewers know where to poke.
+
 ### 2. Small-card execution + per-card acceptance
 Each card runs in a **fresh context**, fed only the relevant SPEC excerpt — no reasoning garbage from prior cards. Run acceptance the moment it's done; **don't advance until it passes**. Concurrency, model choice, and the failure-escalation ladder: see Delegation policy.
 
 ### 3. Adversarial self-check
 Important output is never "generate and ship". Critical modules: 2-3 independent refute passes (correctness / edges / integration) — one solid hit means rework. Wide solution spaces: N approaches + judge + synthesize. **Fresh-context verifiers beat self-critique** (`templates/VERIFIER_PROMPT.md`); verifier prompts say "assume broken, falsify hard", never "take a look".
 
+**Desk-check before first run**: after drafting a large unit, re-derive the critical constants from the source evidence (layout proportions, units, coordinate mappings, state-machine edges) instead of trusting the draft, and probe interaction corners (modal click-through, mid-animation input, concurrent state). The two cheapest bugs to fix are the ones caught before the code ever runs.
+
 ### 4. Real-product verification (iron rule)
 All-green static checks ≠ it works. Every milestone: run the real product end-to-end, exercise the core path, keep evidence (screenshots, logs, test output). Report evidence, not adjectives.
+
+- **If the product can't be driven, make it drivable first.** Environment blocks real verification (headless browser throttles rAF, no display, async UI)? Don't downgrade to static checks — build a deterministic test hook *into the product* (step-the-clock / inject-input / introspect-state, e.g. a `window.__test` API), then simulate the full loop through it. Testability is a product feature; ship it.
+- **Measure, don't eyeball.** Screenshots lie (JPEG, perception bias). When a visual looks wrong, compute the expected value (RGB after blending, px position) and sample-compare before "fixing" anything. A non-bug fixed is a bug added.
+- **Verify the full loop after the last fix**, not just the step that failed — fixes shift behavior upstream and downstream.
 
 ### 5. Context hygiene (external memory)
 `docs/SPEC.md` + `docs/PROGRESS.md` updated in real time, not batched. Segment long tasks: each segment restores from SPEC + PROGRESS only. Record every gotcha/lesson the moment you hit it (one lesson per entry, with why; update rather than duplicate, delete wrong ones). Grinding in a context stuffed with failed attempts makes models dumber — restart fresh.
 
 ### 6. Checkpoint autonomy
 Background long tasks get a **watchdog** (output-file mtime). Organize resumable: any step dying loses at most one card. Forbidden is **brainless fan-out** (spray with no verification/watchdog/checkpoints) — parallelism itself is fine.
+
+## Failure attribution ladder (before touching the fix)
+
+When acceptance fails — or a fix "doesn't work" — attribute before you edit, cheapest layer first:
+
+1. **The harness**: test drivers and acceptance scripts are code too. A too-conservative driver strategy or a wrong expected-value reads exactly like a product bug. Falsify the test before the tested.
+2. **The deployment**: prove the new code is actually running — look for a behavior signature only the new version has (or stamp one), bust caches (`fetch(url, {cache:'reload'})`, restart, rebuild). "Fix had no effect" is, embarrassingly often, "fix never ran".
+3. **The product**: only now debug. And fix the **class, not the instance** — restate the bug as a violated invariant and enforce the invariant ("every color's un-merged bucket count stays ≡ 0 mod 3"), instead of patching the one observed symptom. Then rerun the whole loop (see lever 4).
+
+Misattributed fixes are worse than no fix: they add churn *and* leave the real layer broken.
 
 ## The Fable 5 habit set (any model, always)
 
@@ -66,6 +84,7 @@ Background long tasks get a **watchdog** (output-file mtime). Organize resumable
 4. **Pause only where the user is genuinely needed**: destructive/irreversible actions, real scope changes, user-only input.
 5. **Assessment vs action**: when the user describes a problem or asks a question, deliver the assessment and stop; before state-changing commands, check the evidence supports that specific action.
 6. **Give the reason, not only the request**, when delegating — intent travels with the card.
+7. **Declare workflow deviations**: when the task's meta-intent overrides a standing default (e.g. "observe my execution" rules out delegating execution), say so in one line with the reason — never silently comply with the default, never silently deviate from it.
 
 ## Delegation policy (concurrency, model, escalation)
 
@@ -87,18 +106,21 @@ Background long tasks get a **watchdog** (output-file mtime). Organize resumable
 
 ## Enforcement layer (hooks — mechanics in `hooks/README.md`)
 
-Three hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
+Four hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
 
 ```
 - [ ] 1. card (machine-checkable acceptance)   <- open: guards enforce
-- [x] 2. done and verified
+- [x] 2. done -- evidence: pytest 21/21        <- [x] REQUIRES an evidence note
 - [~] 3. not this round -- deferred: reason
 PAUSED: reason                                 <- a line anywhere: enforcement off
 ```
 
 - **Spawn Guard** (PreToolUse Agent/Task/Workflow): blocks a detailed spawn while no task cards exist (design gate), and blocks any spawn requesting a **model stronger than the session's** (model ceiling — checked on the `model` param and `model:` literals in Workflow scripts; stays active even when paused, it protects quota, not workflow).
-- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain.
+- **Fail-Streak Reminder** (PostToolUse Bash, advisory): every 3rd consecutive failing command injects the attribution ladder — stops grinding on the wrong layer mechanically, not by willpower.
+- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain, **and** while any `- [x]` lacks an `-- evidence:` note (evidence-on-close: adjectives don't close cards).
 - **Profile Injector** (SessionStart): injects tier + routing + habits, **sized to the ledger state** — full when a round is starting/active, minimal when idle, one line when paused.
+
+**Wrap-up lint**: `python3 <skill-dir>/hooks/fable_lint.py <project_dir>` — machine-checks the discipline itself (SPEC source tags present, open cards name acceptance, closed cards carry evidence). Run it at step 7 of the execution template; findings are open work.
 
 **Per-task granularity**: *active* (open cards) = full enforcement; *idle* (no/all-closed cards) = quiet, small tasks flow freely; *paused* (PAUSED line) = guards off except the ceiling. Write PAUSED only when the user steers to work unrelated to the round; remove it to resume. Small spawns (<1500 chars) and forks skip the design gate; everything fails open (a guard bug never bricks the session); loop-safe.
 
@@ -113,7 +135,7 @@ PAUSED: reason                                 <- a line anywhere: enforcement o
 4. Per-card acceptance -> update PROGRESS.md
 5. Milestone adversarial self-check (refute or N-approach review)
 6. End-to-end real verification, leave evidence
-7. Wrap: PROGRESS complete, lessons recorded, push if asked
+7. Wrap: fable_lint clean, PROGRESS complete, lessons recorded, push if asked
 ```
 
 ## Red lines

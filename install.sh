@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fable-mode installer — registers the three guard hooks into your Claude Code
+# fable-mode installer — registers the four guard hooks into your Claude Code
 # settings.json. Idempotent and safe to re-run. Requires python3 (stdlib only).
 #
 # It resolves its OWN directory, so the hook paths are correct no matter where
@@ -30,6 +30,7 @@ hooks_dir = os.path.join(skill_dir, "hooks")
 SPECS = [
     ("SessionStart", None,                  "fable_profile_inject.py"),
     ("PreToolUse",   "Agent|Task|Workflow", "fable_spawn_guard.py"),
+    ("PostToolUse",  "Bash",                "fable_fail_streak.py"),
     ("Stop",         None,                   "fable_close_guard.py"),
 ]
 NAMES = {fname for _, _, fname in SPECS}

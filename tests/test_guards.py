@@ -81,8 +81,10 @@ check("close/no-fable", run(CLOSE, {"cwd": d}), 0)
 d = proj(with_fable=True, git=True, ledger="- [ ] 1. unfinished\n- [x] 2. done\n")
 check("close/open-item-block", run(CLOSE, {"cwd": d}), 2)
 
-# 3. ledger all closed -> allow
-d = proj(with_fable=True, git=True, ledger="- [x] 1. done\n- [~] 2. skip -- deferred: n/a\n")
+# 3. ledger all closed WITH evidence -> allow
+d = proj(with_fable=True, git=True,
+         ledger="- [x] 1. done -- evidence: pytest 21/21\n"
+                "- [~] 2. skip -- deferred: n/a\n")
 check("close/all-closed-allow", run(CLOSE, {"cwd": d}), 0)
 
 # 4. open item BUT stop_hook_active -> allow (loop safety)
@@ -97,6 +99,107 @@ check("close/no-ledger-file", run(CLOSE, {"cwd": d}), 0)
 p = subprocess.run([sys.executable, CLOSE], input="}{bad", capture_output=True,
                    text=True, cwd=proj(git=True))
 check("close/malformed-failopen", p.returncode, 0)
+
+# ---- Evidence-on-close (close guard) ----
+# 1. all closed but a [x] lacks evidence -> BLOCK
+d = proj(with_fable=True, git=True, ledger="- [x] 1. done\n")
+check("evidence/missing-blocks", run(CLOSE, {"cwd": d}), 2)
+
+# 2. Chinese marker accepted
+d = proj(with_fable=True, git=True, ledger="- [x] 1. 完成 —— 证据: 截图 x.png\n")
+check("evidence/zh-marker-allows", run(CLOSE, {"cwd": d}), 0)
+
+# 2b. legacy `verified:` marker accepted (template compatibility)
+d = proj(with_fable=True, git=True, ledger="- [x] 1. done — verified: pytest 12 passed\n")
+check("evidence/verified-marker-allows", run(CLOSE, {"cwd": d}), 0)
+
+# 3. open items take precedence (block message is about the open card)
+d = proj(with_fable=True, git=True, ledger="- [ ] 1. open\n- [x] 2. done\n")
+check("evidence/open-still-blocks", run(CLOSE, {"cwd": d}), 2)
+
+# 4. PAUSED disables evidence enforcement too
+d = proj(with_fable=True, git=True, ledger="- [x] 1. done\nPAUSED: side work\n")
+check("evidence/paused-allows", run(CLOSE, {"cwd": d}), 0)
+
+# 5. loop safety still applies
+d = proj(with_fable=True, git=True, ledger="- [x] 1. done\n")
+check("evidence/loop-safety", run(CLOSE, {"cwd": d, "stop_hook_active": True}), 0)
+
+# ---- Fail-streak reminder (PostToolUse Bash) ----
+STREAK = os.path.join(HOOKS, "fable_fail_streak.py")
+
+def run_streak(payload):
+    p = subprocess.run([sys.executable, STREAK], input=json.dumps(payload),
+                       capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+FAIL_RESP = {"stdout": "", "stderr": "boom", "exitCode": 1}
+OK_RESP = {"stdout": "ok", "stderr": "", "exitCode": 0}
+
+# unique per run: the streak file persists in tempdir, stale counts would skew
+import time
+RUN_TAG = "%d" % (time.time() * 1000)
+
+# 1. three consecutive failures -> advisory context on the 3rd, exit 0 always
+d = proj(with_fable=True, git=True, ledger="- [ ] 1. card\n")
+sid = "fbtest-streak-1-" + RUN_TAG
+outs = [run_streak({"cwd": d, "session_id": sid, "tool_name": "Bash",
+                    "tool_response": FAIL_RESP}) for _ in range(3)]
+check("streak/all-exit-0", all(rc == 0 for rc, _ in outs), True)
+check("streak/quiet-before-3", ("additionalContext" not in outs[0][1]
+                                and "additionalContext" not in outs[1][1]), True)
+check("streak/reminds-at-3", "attribution ladder" in outs[2][1], True)
+
+# 2. success resets the streak
+run_streak({"cwd": d, "session_id": sid, "tool_name": "Bash", "tool_response": OK_RESP})
+rc, out = run_streak({"cwd": d, "session_id": sid, "tool_name": "Bash",
+                      "tool_response": FAIL_RESP})
+check("streak/success-resets", "additionalContext" not in out, True)
+
+# 3. not opted in -> inert even on failures
+d2 = proj(git=True)
+sid2 = "fbtest-streak-2-" + RUN_TAG
+outs = [run_streak({"cwd": d2, "session_id": sid2, "tool_name": "Bash",
+                    "tool_response": FAIL_RESP}) for _ in range(4)]
+check("streak/no-fable-inert", all("additionalContext" not in o for _, o in outs), True)
+
+# 4. PAUSED -> off
+d3 = proj(with_fable=True, git=True, ledger="- [ ] 1. c\nPAUSED: x\n")
+sid3 = "fbtest-streak-3-" + RUN_TAG
+outs = [run_streak({"cwd": d3, "session_id": sid3, "tool_name": "Bash",
+                    "tool_response": FAIL_RESP}) for _ in range(4)]
+check("streak/paused-off", all("additionalContext" not in o for _, o in outs), True)
+
+# ---- fable_lint ----
+LINT = os.path.join(HOOKS, "fable_lint.py")
+
+def run_lint(d):
+    p = subprocess.run([sys.executable, LINT, d], capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+# 1. clean project -> exit 0
+d = proj(with_fable=True, git=True,
+         ledger="- [ ] 1. build x -- acceptance: `pytest -q`\n"
+                "- [x] 2. done -- evidence: 21/21 green\n")
+os.makedirs(os.path.join(d, "docs"))
+with open(os.path.join(d, "docs", "SPEC.md"), "w") as f:
+    f.write("# spec\n- rate 1000/s [measured]\n")
+rc, out = run_lint(d)
+check("lint/clean-exit-0", rc, 0)
+
+# 2. violations (no tags, no acceptance hint, no evidence) -> exit 1, 3 findings
+d = proj(with_fable=True, git=True,
+         ledger="- [ ] 1. vague card\n- [x] 2. done\n")
+os.makedirs(os.path.join(d, "docs"))
+with open(os.path.join(d, "docs", "SPEC.md"), "w") as f:
+    f.write("# spec with no tags\n")
+rc, out = run_lint(d)
+check("lint/violations-exit-1", rc, 1)
+check("lint/finds-all-three", out.count("FINDING") == 3, True)
+
+# 3. not a fable project -> exit 0 with note
+rc, out = run_lint(proj(git=True))
+check("lint/non-project-exit-0", rc, 0)
 
 # ---- Model ceiling (spawn guard + injector session cache) ----
 INJ = os.path.join(HOOKS, "fable_profile_inject.py")

@@ -5,7 +5,8 @@ import json, os, shutil, subprocess, tempfile, sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTALL_SRC = os.path.join(REPO, "install.sh")
-NAMES = ["fable_profile_inject.py", "fable_spawn_guard.py", "fable_close_guard.py"]
+NAMES = ["fable_profile_inject.py", "fable_spawn_guard.py",
+         "fable_fail_streak.py", "fable_close_guard.py"]
 passed = failed = 0
 
 
@@ -49,11 +50,14 @@ try:
     # A. fresh install into an empty config dir
     r = run(skill, cfg)
     d = load(cfg)
-    check("install/fresh-creates-3-events",
-          r.returncode == 0 and set(d["hooks"]) == {"SessionStart", "PreToolUse", "Stop"})
+    check("install/fresh-creates-4-events",
+          r.returncode == 0 and set(d["hooks"]) ==
+          {"SessionStart", "PreToolUse", "PostToolUse", "Stop"})
     check("install/absolute-paths", all(skill in c for c in cmds(d) if "fable_" in c))
     check("install/matcher-on-pretooluse",
           d["hooks"]["PreToolUse"][0].get("matcher") == "Agent|Task|Workflow")
+    check("install/matcher-on-posttooluse",
+          d["hooks"]["PostToolUse"][0].get("matcher") == "Bash")
 
     # B. idempotent — second run must not duplicate
     run(skill, cfg)

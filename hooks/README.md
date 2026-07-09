@@ -4,19 +4,25 @@ The enforcement layer: turn a few of fable-mode's prose rules into Claude Code
 hooks that actually block — ledger-before-delegation and close-verification,
 built around this repo's SPEC.md/PROGRESS.md conventions.
 
-## Three hooks
+## Four hooks + one lint CLI
 
 | Hook | Event | What it does |
 |---|---|---|
 | `fable_profile_inject.py` | `SessionStart` | When the project has opted in, **auto-inject the tier by model + the six levers + ledger context recovery** (no need to type "use fable mode") |
 | `fable_spawn_guard.py` | `PreToolUse` (Agent\|Task\|Workflow) | When opted in: **block a detailed spawn with no ledger** (forces the plan gate) and **block any spawn requesting a model stronger than the session's** (the model ceiling) |
-| `fable_close_guard.py` | `Stop` | While the ledger still has unchecked items, **block ending the turn** (cures early stopping / spinning) |
+| `fable_fail_streak.py` | `PostToolUse` (Bash) | Advisory, never blocks: at every 3rd **consecutive failing command**, inject the attribution ladder (harness → deployment → product; fix the class via an invariant). Streak state: `$TMPDIR/fable-mode-sessions/<sid>.fails`, reset on success. |
+| `fable_close_guard.py` | `Stop` | While the ledger still has unchecked items, **block ending the turn** (cures early stopping / spinning). When all items are checked, **block if any `- [x]` lacks an evidence marker** (`-- evidence:` / `证据:`) — evidence-on-close. |
 
-`_fable_common.py` is the shared helper for all three (read stdin, walk up to find `.fable/`, parse the ledger).
+`fable_lint.py` is **not a hook** — a one-shot CLI (`python3 fable_lint.py <project_dir>`)
+for wrap-up or CI: SPEC exists and carries source tags ([measured]/[inferred]/[not-shown]
+or the Chinese set), open cards name their acceptance, closed cards carry evidence.
+Exit 1 with `FINDING` lines if the discipline leaks.
+
+`_fable_common.py` is the shared helper for all of them (read stdin, walk up to find `.fable/`, parse the ledger, evidence regex, streak store).
 
 ## Opt-in signal: the `.fable/` directory (searched upward, bounded at git root)
 
-The three hooks are registered in the global `settings.json` and fire for every
+The four hooks are registered in the global `settings.json` and fire for every
 project, every session. "Does the project root have a `.fable/` directory" is
 the switch:
 
@@ -42,13 +48,14 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 
 ```
 - [ ] 1. an open card (each card with a machine-checkable acceptance test)
-- [x] 2. done and verified
+- [x] 2. done -- evidence: pytest 21/21
 - [~] 3. not this round -- deferred: reason
 PAUSED: reason        <- optional line anywhere: suspend enforcement
 ```
 
 - `- [ ]` = open, blocks stop.
-- `- [x]` / `- [~]` = closed.
+- `- [x]` / `- [~]` = closed. A `- [x]` additionally needs an evidence note
+  (`evidence:` / `verified:` / `证据:`) or the close guard blocks turn-end.
 - `PAUSED` (line prefix, case-insensitive) = enforcement off **except the model
   ceiling** (quota protection is not workflow discipline). For user-steered
   work unrelated to the current round; remove the line to resume.

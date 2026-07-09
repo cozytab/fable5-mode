@@ -5,9 +5,11 @@ State machine: `- [ ]` open (blocks turn-end) · `- [x]` done AND verified ·
 A line `PAUSED: reason` anywhere suspends enforcement (for user-steered work
 unrelated to this round) — the model ceiling stays active; remove to resume.
 
-Only mark `- [x]` after the acceptance command actually ran — cite evidence:
+Only mark `- [x]` after the acceptance command actually ran — the Close Guard
+blocks turn-end for any `- [x]` without an evidence note (`-- evidence:` /
+`verified:` / `证据:`):
 
 - [ ] 1. <card> — acceptance: `<command>`
 - [ ] 2. <card> — acceptance: `<command>`
-- [x] 0. (example) scaffold — verified: `pytest -q` -> 12 passed
+- [x] 0. (example) scaffold -- evidence: `pytest -q` -> 12 passed
 - [~] 9. (example) dark mode -- deferred: not this round

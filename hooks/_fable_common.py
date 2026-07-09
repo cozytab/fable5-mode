@@ -120,6 +120,56 @@ def load_session_model(session_id):
         return None
 
 
+# --- evidence-on-close convention (lever 4: report evidence, not adjectives) ---
+
+EVIDENCE_RE = re.compile(r"(evidence|verified|证据|凭证|验证)\s*[:：]", re.IGNORECASE)
+
+
+def closed_without_evidence(path):
+    """List `- [x]` ledger lines that carry no evidence marker.
+
+    Convention: a card may only be checked `- [x]` together with a short
+    evidence note (`-- evidence: <command output / screenshot / test count>`).
+    Returns [] on any read problem (fail-open).
+    """
+    bad = []
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                s = line.strip()
+                if s[:5].lower() == "- [x]" and not EVIDENCE_RE.search(s):
+                    bad.append(s)
+    except Exception:
+        return []
+    return bad
+
+
+# --- consecutive-failure streak (attribution-ladder reminder) ---
+
+def _streak_file(session_id):
+    return os.path.join(_sessions_dir(), _safe_sid(session_id) + ".fails")
+
+
+def load_fail_streak(session_id):
+    if not session_id:
+        return 0
+    try:
+        with open(_streak_file(session_id), encoding="utf-8") as fh:
+            return max(0, int(fh.read().strip() or 0))
+    except Exception:
+        return 0
+
+
+def save_fail_streak(session_id, n):
+    if not session_id:
+        return
+    try:
+        with open(_streak_file(session_id), "w", encoding="utf-8") as fh:
+            fh.write(str(int(n)))
+    except Exception:
+        pass
+
+
 def parse_ledger(path):
     """Return (open_items, has_any, paused) for a ledger file.
 

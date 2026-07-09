@@ -127,6 +127,9 @@ def main():
         "  1. docs/SPEC.md  -- requirements + approach + task-card list\n"
         "  2. .fable/LEDGER.md  -- one checkbox per card:\n"
         "       - [ ] 1. <card>  (each card needs a machine-checkable acceptance test)\n"
+        "Close the load-bearing unknowns with targeted probes first and tag SPEC "
+        "decisions [measured]/[inferred]/[not-shown]; cards close only with an "
+        "`-- evidence:` note.\n"
         "Then retry the delegation. (Small spawns < %d chars and forks are exempt.)\n"
         % threshold
     )

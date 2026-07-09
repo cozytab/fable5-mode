@@ -74,13 +74,18 @@ Claude 仍会用**你的**语言回复。
 
 ## 强制层（比提示词多出来的那部分）
 
-六大杠杆写成散文，仍靠模型自觉。三个 hook 把最容易偷懒的规则变成硬拦截：
+六大杠杆写成散文，仍靠模型自觉。四个 hook 把最容易偷懒的规则变成硬拦截：
 
 | Hook | 事件 | 效果 |
 |---|---|---|
 | **Profile Injector** | `SessionStart` | 自动注入纪律，**按账本状态定量**——进行中的轮次注入全量，空闲/暂停时只有一行——外加按模型选档和未勾项恢复。 |
 | **Spawn Guard** | `PreToolUse`（Agent/Task/Workflow） | 没写账本就想派详细 subagent/Workflow，拦——逼你先过设计门禁；同时机械执行**模型天花板**：任何想用比主会话更强模型的 spawn 直接拦下，不再只靠嘴上说。 |
-| **Close Guard** | `Stop` | 账本还有未勾项就想结束回合，拦——治提前收尾/空转。 |
+| **Fail-Streak Reminder** | `PostToolUse`（Bash） | 纯提醒、永不拦截：连续第 3 次命令失败时注入**归因阶梯**（先怀疑测试本身 → 再证明新代码真的在跑 → 最后才调产品，且按不变量修"类"不修"例"）——治在错误层级上死磨。 |
+| **Close Guard** | `Stop` | 账本还有未勾项就想结束回合，拦——治提前收尾/空转。同时强制**关卡带证据**：`- [x]` 卡片没有 `-- evidence:` 标记就想收尾，拦——"报证据，不报形容词"从嘴上说变成硬规则。 |
+
+另有 **`hooks/fable_lint.py`**（非 hook，一键体检 CLI）：查 SPEC 是否带
+`[实测]/[推断]/[未展示]` 来源标签、每张开卡是否写了验收、每张关卡是否带证据。
+收尾或 CI 时跑：`python3 hooks/fable_lint.py <项目目录>`。
 
 让它敢全局注册的几个设计属性：
 
@@ -109,7 +114,7 @@ bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/install.sh"
 ```
 
 `install.sh` 会**解析自己的位置**（所以不管你 clone 到哪，hook 路径都对）、认
-`CLAUDE_CONFIG_DIR`、并把三个 hook **合并**进 `settings.json` 而不破坏已有配置。
+`CLAUDE_CONFIG_DIR`、并把四个 hook **合并**进 `settings.json` 而不破坏已有配置。
 它是幂等的——skill 换了位置再跑一次就会重新指向新路径。随时可用
 `bash install.sh --uninstall` 移除 hook。
 
