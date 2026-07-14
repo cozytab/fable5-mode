@@ -74,9 +74,12 @@ def main():
         lines += "\n    ... and %d more" % more
     sys.stderr.write(
         "[fable-mode] BLOCKED stop: %d open ledger item(s) in %s\n%s\n"
-        "Finish each item and verify it (its acceptance command), then mark "
-        "`- [x]`; or if genuinely out of scope, mark `- [~] ... -- deferred: "
-        "reason`. Do the work now rather than ending the turn.\n"
+        "Three legitimate exits: (1) finish each item, verify it (its "
+        "acceptance command), mark `- [x] ... -- evidence: <proof>`; "
+        "(2) genuinely out of scope -> `- [~] ... -- deferred: reason`; "
+        "(3) the user is steering to unrelated work -> add a line "
+        "`PAUSED: reason` to the ledger and continue with what they asked. "
+        "Do NOT invent completion — pick the exit that matches reality.\n"
         % (len(open_items), path, lines)
     )
     return 2

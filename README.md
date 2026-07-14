@@ -110,6 +110,9 @@ See **[`hooks/README.md`](hooks/README.md)** for the mechanics.
 
 **Prerequisites**: [Claude Code](https://claude.com/claude-code), and `python3`
 (standard library only — no third-party deps; needed only if you use the hooks).
+Hooks assume a POSIX environment (macOS / Linux / WSL) where `python3` is on
+PATH; on native Windows the skill itself still works, but the mechanical
+enforcement layer is untested there — treat it as protocol-only.
 
 Your Claude config directory is `$CLAUDE_CONFIG_DIR` if that variable is set,
 otherwise `~/.claude`. Everything below derives from it, so it works no matter
@@ -137,6 +140,10 @@ Or just tell Claude Code:
 events (e.g. a `PostToolUse` hook), and only the installer updates your
 `settings.json` — a plain `git pull` ships the files but won't register new
 hooks. It's idempotent, so re-running is always safe.
+
+**Note**: hook registration (install or update) takes effect from your **next
+Claude Code session** — settings are read at session start, so restart or open
+a new session after running the installer.
 
 ### Option B — manual
 
@@ -202,6 +209,10 @@ tier; you can't dispatch a detailed agent without a ledger; you can't end a turn
 with unchecked cards. Mark cards `- [x]` (done + verified) or
 `- [~] ... -- deferred: reason` to close them. To turn enforcement off, check
 everything or `rm -rf .fable`.
+
+**Project hygiene**: add `.fable/` to your project's `.gitignore` — it's this
+round's working state, not history. `docs/SPEC.md` and `docs/PROGRESS.md` are
+durable project documents: commit those (unless you prefer them private).
 
 **Big project, small tasks?** Enforcement is per-*round*, not per-*keystroke*:
 with all cards closed (idle) the guards stay quiet and quick fixes flow freely

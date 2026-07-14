@@ -201,6 +201,15 @@ check("lint/finds-all-three", out.count("FINDING") == 3, True)
 rc, out = run_lint(proj(git=True))
 check("lint/non-project-exit-0", rc, 0)
 
+# 4. deferred card without a reason -> finding; with reason -> clean
+d = proj(with_fable=True, git=True,
+         ledger="- [~] 1. skipped\n- [~] 2. skipped -- deferred: out of scope this round\n")
+os.makedirs(os.path.join(d, "docs"))
+with open(os.path.join(d, "docs", "SPEC.md"), "w") as f:
+    f.write("# spec\n- x [measured]\n")
+rc, out = run_lint(d)
+check("lint/defer-without-reason-flagged", rc == 1 and out.count("FINDING") == 1, True)
+
 # ---- Model ceiling (spawn guard + injector session cache) ----
 INJ = os.path.join(HOOKS, "fable_profile_inject.py")
 

@@ -15,6 +15,9 @@ Checks (each finding names the file and the rule):
      acceptance/验收, or carries a `backtick command`).
   4. Every closed `- [x]` ledger card carries an evidence marker
      (`-- evidence:` / `证据:`).
+  5. Every deferred `- [~]` card carries a reason (`-- deferred: why` /
+     `搁置:`/`推迟:`) — deferring everything is the cheap way out of a round;
+     reasons keep it auditable.
 
 Exit 0 = clean, exit 1 = findings (printed one per line), exit 0 with a note
 if the directory isn't a fable-mode project at all.
@@ -32,6 +35,7 @@ SOURCE_TAG_RE = re.compile(
     r"\[(measured|inferred|not-shown|design-gap|实测|读数|推断|未展示|设计补全)\]",
     re.IGNORECASE)
 ACCEPTANCE_HINT_RE = re.compile(r"(accept|验收|test|测试|`[^`]+`)", re.IGNORECASE)
+DEFER_REASON_RE = re.compile(r"(deferred|搁置|推迟)\s*[:：]\s*\S{2,}", re.IGNORECASE)
 
 
 def lint(project_dir):
@@ -68,6 +72,11 @@ def lint(project_dir):
                         findings.append(
                             "%s:%d: open card with no acceptance hint "
                             "(name the test/command that will prove it): %s"
+                            % (lp, i, s))
+                    elif s[:5].lower() == "- [~]" and not DEFER_REASON_RE.search(s):
+                        findings.append(
+                            "%s:%d: deferred card without a reason "
+                            "(`-- deferred: why` keeps skips auditable): %s"
                             % (lp, i, s))
         except Exception:
             pass

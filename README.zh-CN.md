@@ -100,7 +100,9 @@ Claude 仍会用**你的**语言回复。
 ## 安装
 
 **前置要求**：[Claude Code](https://claude.com/claude-code)，以及 `python3`
-（仅标准库，无第三方依赖；只有用 hook 时才需要）。
+（仅标准库，无第三方依赖；只有用 hook 时才需要）。hook 假定 POSIX 环境
+（macOS / Linux / WSL）且 `python3` 在 PATH 上；原生 Windows 下 skill 本身可用，
+但机械强制层未在其上验证——当作纯协议用。
 
 你的 Claude 配置目录：设了 `$CLAUDE_CONFIG_DIR` 就用它，否则是 `~/.claude`。下面
 全部由它推导，所以你的配置装在哪都能用。
@@ -125,6 +127,9 @@ bash "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/install.sh"
 **升级**：`git pull` 之后**重跑 `install.sh`**。新版本可能新增 hook 事件（比如
 `PostToolUse`），而只有安装脚本会更新你的 `settings.json`——单纯 `git pull` 只更新
 文件、不会注册新 hook。脚本幂等，重跑永远安全。
+
+**注意**：hook 的注册（安装或升级）从你的**下一个 Claude Code 会话**开始生效——
+settings 在会话启动时读取，跑完安装脚本后重启或新开一个会话即可。
 
 ### 方式 B —— 手动
 
@@ -180,6 +185,10 @@ EOF
 从此在该项目里：会话自动加载纪律和正确档位；没账本不能派详细 agent；有未勾卡不能
 结束回合。把卡标成 `- [x]`（完成并验证）或 `- [~] ... -- deferred: 原因` 来关闭。
 想关掉强制：把卡勾完，或 `rm -rf .fable`。
+
+**项目卫生**：把 `.fable/` 加进你项目的 `.gitignore`——它是本轮的工作状态，不是
+历史。`docs/SPEC.md` 和 `docs/PROGRESS.md` 是耐久的项目文档：建议提交（想保密也
+可以不提交）。
 
 **大项目里的小需求？** 强制是按**轮次**的，不是按键盘的：卡全勾完（空闲态）时守卫
 静默、注入近乎为零，小修小改畅通无阻。轮次进行中要临时干别的，在 `.fable/LEDGER.md`

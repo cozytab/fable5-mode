@@ -89,5 +89,7 @@ print("            hook scripts: %s" % hooks_dir)
 PY
 
 if [ "$MODE" = "install" ]; then
-  echo "Done. The hooks are inert until a project has a .fable/ directory."
+  echo "Done. Hooks take effect from your NEXT Claude Code session (settings"
+  echo "are read at session start) — restart or open a new session to arm them."
+  echo "They stay inert until a project has a .fable/ directory."
 fi

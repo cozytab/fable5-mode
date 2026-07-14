@@ -131,7 +131,7 @@ missing.)
 
 **Per-task granularity**: *active* (open cards) = full enforcement; *idle* (no/all-closed cards) = close guard quiet and small tasks flow freely, but a **detailed** fan-out still needs a live card first; *paused* (a `PAUSED: reason` line) = guards off except the ceiling. Write PAUSED only when the user steers to work unrelated to the round; remove it to resume. Small spawns (<1500 chars) and forks skip the design gate; everything fails open (a guard bug never bricks the session); loop-safe.
 
-**For substantial work: after writing the SPEC, `mkdir .fable` + create `.fable/LEDGER.md` to get the mechanical backstop.**
+**For substantial work: after writing the SPEC, `mkdir .fable` + create `.fable/LEDGER.md` to get the mechanical backstop.** In the user's repo, suggest gitignoring `.fable/` (round state) while committing `docs/SPEC.md`/`PROGRESS.md` (durable docs).
 
 ## Execution-order template
 

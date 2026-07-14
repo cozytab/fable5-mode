@@ -134,6 +134,7 @@ def main():
         "Close the load-bearing unknowns with targeted probes first and tag SPEC "
         "decisions [measured]/[inferred]/[not-shown]; cards close only with an "
         "`-- evidence:` note.\n"
+        "Starter skeletons: <skill-dir>/templates/ (SPEC/LEDGER/PROGRESS).\n"
         "Then retry the delegation. (Small spawns < %d chars and forks are exempt.)\n"
         % threshold
     )
