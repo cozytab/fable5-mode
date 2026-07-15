@@ -53,6 +53,7 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 - [x] 2. done -- evidence: pytest 21/21
 - [~] 3. not this round -- deferred: reason
 PAUSED: reason        <- optional line anywhere: suspend enforcement
+ROUTING: frugal       <- optional: model-routing profile for this round
 ```
 
 - `- [ ]` = open, blocks stop. Detailed fan-out requires at least one open
@@ -66,6 +67,13 @@ PAUSED: reason        <- optional line anywhere: suspend enforcement
   **except the model ceiling** (quota protection is not workflow discipline).
   For user-steered work unrelated to the current round; remove the line to
   resume.
+- `ROUTING: quality|balanced|frugal` (optional, per-round) = model-routing
+  profile the injector announces: **quality** = no downgrades at all,
+  **balanced** (default) = inherit unless a tightly-specified card can safely
+  drop one tier, **frugal** = implementation cards default one tier down.
+  Env `FABLE_ROUTING` overrides the line. In every profile, decomposition/
+  design/debugging/verification stay on the session model, and the escalation
+  ladder (fail twice → tier up, capped at the session model) is unchanged.
 - SPEC.md/PROGRESS.md remain the durable design/progress docs; LEDGER.md is only the enforcement-state snapshot of "what I committed to this round."
 
 ## Per-task granularity (big projects)

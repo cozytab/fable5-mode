@@ -93,19 +93,23 @@ Misattributed fixes are worse than no fix: they add churn *and* leave the real l
 
 **Concurrency** — conservative by default: **≤5 concurrent**, inline-first, don't split when unsure. The throughput tier (dispatch readily, async, no fixed cap — field deployments 10-500+; subagents are one level deep) opens **only** when the user explicitly asks or the session model is Fable-class; state the honest cost: ~15x tokens + rate-limit risk. Never open it silently. **Shepherd, don't babysit**: after dispatching, keep working instead of blocking on each return — but read results as they land and intervene the moment a subagent drifts off spec or lacks context it needs.
 
-**Model routing (capability-matched)** — mirrors Anthropic's own practice (Opus-class lead + Sonnet-class subagents; Explore on Haiku; inherit when unsure):
+**Model routing — three profiles, two iron rules.** Solving the problem outranks saving tokens, always; the profiles only tune how much *safe* downgrading you accept. Two rules hold in **every** profile:
 
-| Card | Model | Effort |
-|---|---|---|
-| Orchestration, design, debugging, root-cause | session model | high/max |
-| Verification, acceptance, adversarial refute | session model — **never weaker than the implementer** | max |
-| Well-specified implementation (machine-checkable acceptance) | one tier down OK | high |
-| Mechanical gather/format/search | cheap tier | low |
+1. **Task decomposition, orchestration, design, debugging, and ALL verification run on the session model — no profile ever downgrades them.** These decide whether the problem gets solved; a cheap model here poisons everything downstream.
+2. **Only a card with machine-checkable acceptance may run below the session model** — the acceptance test is what makes a downgrade safe (a weak executor's failure is caught immediately and cheaply). When unsure, inherit.
 
-**Safety net — what makes downgrading safe:**
-- Only downgrade cards whose acceptance is **machine-checkable**; vague or judgment-laden cards stay on the session model.
-- Acceptance fails once → retry with the failure output; fails twice → escalate one tier, **capped at the session model** — the top of the ladder is pulling the card back inline, never a stronger model. fable-mode exists to get Fable-5-grade results *without* Fable 5; never spawn above the session model (`FABLE_ESCALATION=on` for genuine upward deferral).
-- When unsure which row a card is, inherit the session model.
+| Profile | Trigger words (user says) | Implementation cards | Mechanical gather/format |
+|---|---|---|---|
+| **quality** | "质量优先 / 全用主模型 / quality mode / no downgrades" | session model, always | session model, low effort |
+| **balanced** (default) | — | inherit by default; drop **one** tier only when tightly specified + machine-checkable acceptance | cheap tier, low effort |
+| **frugal** | "节省模式 / 省着点用 / frugal / save quota" | default **one tier down** (acceptance still required); tricky cards stay inherited | cheapest tier, low effort |
+
+Selecting a profile: the user's words above, env `FABLE_ROUTING=quality|balanced|frugal`, or a `ROUTING: <profile>` line in `.fable/LEDGER.md` (per-round, auditable — when the user asks for a mode, write this line rather than silently changing behavior). Default is **balanced**; never switch profiles silently.
+
+**Safety net — identical in all profiles (this is why even frugal still solves the problem):**
+- Acceptance fails once → retry with the failure output; fails twice → escalate one model tier, **capped at the session model** — the top of the ladder is pulling the card back inline, never a stronger model. In frugal mode the ladder matters *more*, not less. fable-mode exists to get Fable-5-grade results *without* Fable 5; never spawn above the session model (`FABLE_ESCALATION=on` for genuine upward deferral).
+- The verifier is never weaker than the implementer; verification effort is always max.
+- Mirrors Anthropic's own practice: Opus-class lead + Sonnet-class subagents; Explore on Haiku; inherit when unsure.
 
 ## Enforcement layer (hooks — mechanics in `hooks/README.md`)
 

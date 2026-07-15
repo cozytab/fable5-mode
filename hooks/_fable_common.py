@@ -125,6 +125,30 @@ def load_session_model(session_id):
 EVIDENCE_RE = re.compile(r"(evidence|verified|证据|凭证|验证)\s*[:：]", re.IGNORECASE)
 
 
+# --- model-routing profiles (quality / balanced / frugal) ---
+
+ROUTING_PROFILES = ("quality", "balanced", "frugal")
+_ROUTING_RE = re.compile(r"^ROUTING\s*[:：]\s*(quality|balanced|frugal)\b",
+                         re.IGNORECASE)
+
+
+def read_routing(path):
+    """Per-round routing profile from a `ROUTING: <profile>` ledger line.
+
+    Returns 'quality'|'balanced'|'frugal', or None when absent/unrecognized
+    (callers fall back to the default). Fail-open on any read problem.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _ROUTING_RE.match(line.strip())
+                if m:
+                    return m.group(1).lower()
+    except Exception:
+        return None
+    return None
+
+
 MIN_EVIDENCE_CHARS = 6
 
 

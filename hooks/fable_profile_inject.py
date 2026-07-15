@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
-    save_session_model,
+    save_session_model, read_routing, ROUTING_PROFILES,
 )
 
 # resolved from this file's real location, correct wherever the skill is cloned
@@ -42,7 +42,49 @@ def choose_profile(model):
     return "throughput" if "fable" in (model or "").lower() else "conservative"
 
 
-def build_context(profile, model, ledger_state, open_items):
+def choose_routing(lp):
+    """Routing profile: env FABLE_ROUTING > ledger `ROUTING:` line > balanced."""
+    env = os.environ.get("FABLE_ROUTING", "").lower()
+    if env in ROUTING_PROFILES:
+        return env
+    return read_routing(lp) or "balanced"
+
+
+def routing_text(routing):
+    """Per-profile routing guidance. The two iron rules and the safety net are
+    identical in every profile — profiles only tune safe downgrading."""
+    if routing == "quality":
+        head = (
+            "Model routing [QUALITY — user-selected]: every card runs on this "
+            "session's model, no downgrades at all; effort still routed "
+            "(max = verify/judge, high = implement, low = gather)."
+        )
+    elif routing == "frugal":
+        head = (
+            "Model routing [FRUGAL — user-selected]: implementation cards "
+            "default ONE tier down (machine-checkable acceptance required; "
+            "tricky or vaguely-specified cards stay inherited); mechanical "
+            "gather/format/search goes to the cheapest tier at low effort."
+        )
+    else:
+        head = (
+            "Model routing [BALANCED]: inherit by default; a tightly-specified "
+            "implementation card (machine-checkable acceptance) may drop one "
+            "tier; mechanical work goes cheap at low effort."
+        )
+    return head + (
+        " In EVERY profile: task decomposition, orchestration, design, "
+        "debugging and all verification stay on this session's model — never "
+        "downgraded. Two failed acceptances -> escalate, CAPPED AT this "
+        "session's model (top of the ladder is pulling the card back inline — "
+        "never spawn above the session model); the verifier must be at least "
+        "as strong as the implementer. When unsure, inherit the session model. "
+        "Switch profiles only when the user asks (write `ROUTING: <profile>` "
+        "into the ledger), never silently."
+    )
+
+
+def build_context(profile, model, ledger_state, open_items, routing):
     m = model or "unknown"
 
     if ledger_state == "paused":
@@ -82,13 +124,7 @@ def build_context(profile, model, ledger_state, open_items):
         "[fable-mode] This project has fable-mode enabled (.fable/ detected). "
         "Follow the six levers in %s." % SKILL,
         tier,
-        "Model routing: design/debugging/verification stay on this session's "
-        "model; a well-specified implementation card (machine-checkable "
-        "acceptance) may drop one tier; mechanical work goes cheap at low "
-        "effort. Two failed acceptances -> escalate, CAPPED AT this session's "
-        "model (top of the ladder is pulling the card back inline — never "
-        "spawn above the session model); the verifier must be at least as "
-        "strong as the implementer. When unsure, inherit the session model.",
+        routing_text(routing),
         "Design gate: docs/SPEC.md (requirements + approach + task cards, "
         "each with machine-checkable acceptance) and cards in "
         ".fable/LEDGER.md (- [ ]/- [x]/- [~]; a `PAUSED: reason` line "
@@ -157,7 +193,9 @@ def main():
         state = "starting"
 
     profile = choose_profile(data.get("model"))
-    context = build_context(profile, data.get("model"), state, open_items)
+    routing = choose_routing(ledger_path(fable_dir))
+    context = build_context(profile, data.get("model"), state, open_items,
+                            routing)
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",

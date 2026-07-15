@@ -155,6 +155,30 @@ rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
 c = ctx(out)
 check("inject/no-cross-project-memory", rc == 0 and c and "Lessons from previous" not in c)
 
+# 21-24. routing profiles: env override, ledger directive, default, invariant
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"}, env={"FABLE_ROUTING": "quality"})
+c = ctx(out)
+check("inject/routing-quality-env", rc == 0 and c and "[QUALITY" in c and "no downgrades" in c)
+
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"}, env={"FABLE_ROUTING": "frugal"})
+c = ctx(out)
+check("inject/routing-frugal-env", rc == 0 and c and "[FRUGAL" in c and "ONE tier down" in c)
+
+d = proj(with_fable=True, ledger="ROUTING: frugal\n- [ ] 1. card -- acceptance: `t`\n")
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/routing-ledger-directive", rc == 0 and c and "[FRUGAL" in c)
+
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"}, env={"FABLE_ROUTING": "bogus"})
+c = ctx(out)
+check("inject/routing-default-balanced-and-invariant",
+      rc == 0 and c and "[BALANCED]" in c
+      and "task decomposition, orchestration, design" in c
+      and "never downgraded" in c)
+
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

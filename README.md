@@ -236,19 +236,27 @@ fable-mode's concurrency isn't a fixed number.
 The Profile Injector picks the tier automatically by model
 (`FABLE_MODE_PROFILE=auto|conservative|throughput` overrides).
 
-**Model routing (capability-matched)**: neither "never downgrade" nor "offload
-to cheap" is right. fable-mode routes by what the card demands — design,
-debugging and **all verification** stay on the session model; a well-specified
-implementation card may drop one tier; mechanical gather/format work goes to a
-cheap tier at low effort. This mirrors Anthropic's own practice (Opus-class lead
-+ Sonnet-class subagents in their research system, +90.2% over single-agent).
-What makes downgrading safe is the safety net: only cards with machine-checkable
-acceptance are downgraded, two failed acceptances escalate the model tier —
+**Model routing — three profiles, two iron rules.** Solving the problem always
+outranks saving tokens; the profiles only tune how much *safe* downgrading you
+accept, and you pick one in plain words:
+
+| Profile | You say | Implementation cards | Mechanical work |
+|---|---|---|---|
+| **quality** | "quality mode / no downgrades / 质量优先" | session model, always | session model |
+| **balanced** (default) | — | inherit; drop **one** tier only when tightly specified | cheap tier |
+| **frugal** | "frugal / save quota / 节省模式" | default one tier down (acceptance still required) | cheapest tier |
+
+The selection is written into the ledger as a `ROUTING: <profile>` line
+(per-round, auditable; env `FABLE_ROUTING` also works) — never switched
+silently. **In every profile**: task decomposition, orchestration, design,
+debugging and all verification stay on the session model — a cheap model there
+poisons everything downstream; only cards with machine-checkable acceptance may
+run below the session model; two failed acceptances escalate the tier —
 **capped at the session model** (the top of the ladder is pulling the card back
 inline, never a stronger model: fable-mode exists to get Fable-5-grade results
-*without* Fable 5, so it never quietly reaches upward) — and the verifier is
-always at least as strong as the implementer. When unsure, inherit the session
-model.
+*without* Fable 5); and the verifier is always at least as strong as the
+implementer. This mirrors Anthropic's own practice (Opus-class lead +
+Sonnet-class subagents, +90.2% over single-agent; inherit when unsure).
 
 ## The Fable 5 habit set
 
