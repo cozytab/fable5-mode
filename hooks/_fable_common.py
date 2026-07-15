@@ -130,6 +130,25 @@ EVIDENCE_RE = re.compile(r"(evidence|verified|证据|凭证|验证)\s*[:：]", r
 ROUTING_PROFILES = ("quality", "balanced", "frugal")
 _ROUTING_RE = re.compile(r"^ROUTING\s*[:：]\s*(quality|balanced|frugal)\b",
                          re.IGNORECASE)
+_TIER_RE = re.compile(r"^TIER\s*[:：]\s*(throughput|conservative)\b",
+                      re.IGNORECASE)
+
+
+def read_tier(path):
+    """Per-round concurrency tier from a `TIER: <tier>` ledger line, or None.
+
+    Same pattern as ROUTING — the user says a word, the model writes the line,
+    the choice persists for the round and stays auditable. Fail-open.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _TIER_RE.match(line.strip())
+                if m:
+                    return m.group(1).lower()
+    except Exception:
+        return None
+    return None
 
 
 def read_routing(path):

@@ -88,10 +88,27 @@ Misattributed fixes are worse than no fix: they add churn *and* leave the real l
 10. **The final summary is a re-grounding, not a continuation.** After a long working stretch, the reader's first look is your last message: outcome first, complete sentences, drop the working shorthand — no arrow chains, no labels you coined mid-task; give each file/flag/identifier its own plain-language clause. Terse notes between tool calls are fine; the wrap-up is for someone who saw none of it.
 11. **Triage multi-threaded requests**: when one message carries several asks, enumerate them explicitly, then address each or explicitly defer it with a reason — a dropped sub-request is a silent failure, the worst kind.
 12. **Code blends in**: match the surrounding file's naming, idiom, and comment density. Comment only constraints the code can't express — never narration of the next line or justification aimed at a reviewer.
+13. **Multitask by default**: batch independent tool calls into one message; run independent side-tasks as background subagents and keep working; integrate results as they land. Serial waiting is a discipline failure too.
 
 ## Delegation policy (concurrency, model, escalation)
 
-**Concurrency** — conservative by default: **≤5 concurrent**, inline-first, don't split when unsure. The throughput tier (dispatch readily, async, no fixed cap — field deployments 10-500+; subagents are one level deep) opens **only** when the user explicitly asks or the session model is Fable-class; state the honest cost: ~15x tokens + rate-limit risk. Never open it silently. **Shepherd, don't babysit**: after dispatching, keep working instead of blocking on each return — but read results as they land and intervene the moment a subagent drifts off spec or lacks context it needs.
+**Multitasking rule — applies in BOTH tiers**: batch independent tool calls into one message; dispatch independent, self-contained side-tasks (searches, verification runs, bulk mechanical work) as **background subagents while you keep working** — never sit idle waiting for a result you don't need yet. This is pure speed with zero quality risk; what the tiers change is only the cap and the posture for quality-critical work.
+
+**Concurrency tiers**:
+- **conservative** (default): **≤5 concurrent**. Quality-critical, tightly-coupled implementation stays inline — don't split when unsure — but the multitasking rule still fills the cap with independent side-tasks.
+- **throughput**: no protocol cap (the harness caps one Workflow at min(16, cores−2) concurrent; field deployments 10-500+; subagents are one level deep). Opens **only** when the user asks (see one-word controls) or the session model is Fable-class; state the honest cost: ~15x tokens + rate-limit risk. Never open it silently.
+
+**Shepherd, don't babysit**: after dispatching, keep working instead of blocking on each return — but read results as they land and intervene the moment a subagent drifts off spec or lacks context it needs.
+
+**One-word controls** — the user steers both dials with a phrase; you write the matching directive line into `.fable/LEDGER.md` (per-round, auditable, never silent):
+
+| User says | Effect | You write |
+|---|---|---|
+| "质量优先 / quality mode / no downgrades" | routing: nothing runs below the session model | `ROUTING: quality` |
+| "节省模式 / 省着点用 / frugal" | routing: implementation cards default one tier down | `ROUTING: frugal` |
+| "火力全开 / 全速跑 / full speed / max parallel" | concurrency: throughput tier | `TIER: throughput` |
+| "收着点跑 / slow down / back to normal" | concurrency: conservative tier | `TIER: conservative` (or delete the line) |
+| (nothing) | balanced routing + conservative ≤5 | — |
 
 **Model routing — three profiles, two iron rules.** Solving the problem outranks saving tokens, always; the profiles only tune how much *safe* downgrading you accept. Two rules hold in **every** profile:
 

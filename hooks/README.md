@@ -54,6 +54,7 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 - [~] 3. not this round -- deferred: reason
 PAUSED: reason        <- optional line anywhere: suspend enforcement
 ROUTING: frugal       <- optional: model-routing profile for this round
+TIER: throughput      <- optional: concurrency tier for this round
 ```
 
 - `- [ ]` = open, blocks stop. Detailed fan-out requires at least one open
@@ -67,6 +68,10 @@ ROUTING: frugal       <- optional: model-routing profile for this round
   **except the model ceiling** (quota protection is not workflow discipline).
   For user-steered work unrelated to the current round; remove the line to
   resume.
+- `TIER: throughput|conservative` (optional, per-round) = concurrency tier
+  the injector announces (env `FABLE_MODE_PROFILE` overrides; default =
+  by session model). The multitasking rule (batch independent tool calls;
+  background side-tasks while working) applies in both tiers.
 - `ROUTING: quality|balanced|frugal` (optional, per-round) = model-routing
   profile the injector announces: **quality** = no downgrades at all,
   **balanced** (default) = inherit unless a tightly-specified card can safely

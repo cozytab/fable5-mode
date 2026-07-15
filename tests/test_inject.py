@@ -179,6 +179,24 @@ check("inject/routing-default-balanced-and-invariant",
       and "task decomposition, orchestration, design" in c
       and "never downgraded" in c)
 
+# 25-27. TIER directive + multitask-within-cap
+d = proj(with_fable=True, ledger="TIER: throughput\n- [ ] 1. card -- acceptance: `t`\n")
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/tier-ledger-flips-throughput", rc == 0 and c and "THROUGHPUT" in c)
+
+d = proj(with_fable=True, ledger="TIER: throughput\n- [ ] 1. card -- acceptance: `t`\n")
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"},
+              env={"FABLE_MODE_PROFILE": "conservative"})
+c = ctx(out)
+check("inject/env-beats-ledger-tier", rc == 0 and c and "CONSERVATIVE" in c)
+
+d = proj(with_fable=True)
+rc, out = run({"cwd": d, "model": "claude-opus-4-8"})
+c = ctx(out)
+check("inject/conservative-multitasks-within-cap", rc == 0 and c
+      and "MULTITASK within the cap" in c and "background subagents" in c)
+
 for d in tmps: shutil.rmtree(d, ignore_errors=True)
 print("\n%d passed, %d failed" % (passed, failed))
 sys.exit(1 if failed else 0)

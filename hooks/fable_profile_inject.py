@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
-    save_session_model, read_routing, ROUTING_PROFILES,
+    save_session_model, read_routing, ROUTING_PROFILES, read_tier,
 )
 
 # resolved from this file's real location, correct wherever the skill is cloned
@@ -35,10 +35,14 @@ SKILL = os.path.join(
 MAX_LIST = 12
 
 
-def choose_profile(model):
+def choose_profile(model, lp):
+    """Concurrency tier: env FABLE_MODE_PROFILE > ledger `TIER:` > by model."""
     env = os.environ.get("FABLE_MODE_PROFILE", "auto").lower()
     if env in ("conservative", "throughput"):
         return env
+    ledger_tier = read_tier(lp)
+    if ledger_tier:
+        return ledger_tier
     return "throughput" if "fable" in (model or "").lower() else "conservative"
 
 
@@ -115,9 +119,14 @@ def build_context(profile, model, ledger_state, open_items, routing):
         )
     else:
         tier = (
-            "Current model %s -> CONSERVATIVE tier: cap concurrency at 5, "
-            "inline-first, don't split unless it clearly helps; if unsure "
-            "delegation preserves quality, do it yourself." % m
+            "Current model %s -> CONSERVATIVE tier: cap concurrency at 5. "
+            "Quality-critical, tightly-coupled implementation stays inline "
+            "(if unsure delegation preserves quality, do it yourself) — but "
+            "MULTITASK within the cap: batch independent tool calls in one "
+            "message, and run independent side-tasks (searches, verification "
+            "runs, bulk mechanical work) as background subagents while you "
+            "keep working. Never sit idle waiting for a result you don't "
+            "need yet." % m
         )
 
     lines = [
@@ -147,7 +156,10 @@ def build_context(profile, model, ledger_state, open_items, routing):
         "the simplest thing that works — no unrequested refactors, "
         "abstractions, or defensive code for impossible scenarios; (9) when "
         "you have enough information to act, act — don't re-litigate settled "
-        "decisions or survey options you won't take.",
+        "decisions or survey options you won't take; (10) multitask: batch "
+        "independent tool calls in one message, run independent side-tasks "
+        "as background subagents and keep working — integrate results as "
+        "they land.",
     ]
 
     if profile == "conservative" and \
@@ -192,7 +204,7 @@ def main():
     else:
         state = "starting"
 
-    profile = choose_profile(data.get("model"))
+    profile = choose_profile(data.get("model"), ledger_path(fable_dir))
     routing = choose_routing(ledger_path(fable_dir))
     context = build_context(profile, data.get("model"), state, open_items,
                             routing)

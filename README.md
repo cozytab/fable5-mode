@@ -226,15 +226,24 @@ stays active); remove it to resume the round.
 
 fable-mode's concurrency isn't a fixed number.
 
+**The multitasking rule applies in both tiers**: independent tool calls are
+batched into one message, and independent side-tasks (searches, verification
+runs, bulk mechanical work) run as background subagents while the main thread
+keeps working — no idle waiting. The tiers only change the cap:
+
 - **Conservative (default)** — cap of ≤5 concurrent subagents, a local rate-limit
-  guardrail. Right for everyday, quota-sensitive, quality-first work.
+  guardrail. Quality-critical implementation stays inline; the cap still gets
+  filled with independent side-tasks.
 - **Throughput (opt-in)** — dispatch parallel subagents readily, communicate
-  async, don't block. No fixed cap; field deployments range 10–500+. It trades
+  async, don't block. No protocol cap; field deployments range 10–500+. It trades
   more tokens for throughput and risks rate limits — so it's enabled only when you
   ask, or auto-selected when the running model is Fable 5.
 
-The Profile Injector picks the tier automatically by model
-(`FABLE_MODE_PROFILE=auto|conservative|throughput` overrides).
+**One-word controls** — say a phrase, Claude writes a per-round directive line
+into `.fable/LEDGER.md` (auditable, never silent): "quality mode" →
+`ROUTING: quality` · "frugal" → `ROUTING: frugal` · "full speed / max parallel"
+→ `TIER: throughput` · "back to normal" → remove it. Env `FABLE_ROUTING` /
+`FABLE_MODE_PROFILE` override; by default the tier follows the session model.
 
 **Model routing — three profiles, two iron rules.** Solving the problem always
 outranks saving tokens; the profiles only tune how much *safe* downgrading you
