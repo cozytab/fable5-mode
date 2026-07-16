@@ -6,7 +6,10 @@ import json, os, shutil, subprocess, tempfile, sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTALL_SRC = os.path.join(REPO, "install.sh")
 NAMES = ["fable_profile_inject.py", "fable_spawn_guard.py",
-         "fable_fail_streak.py", "fable_close_guard.py"]
+         "fable_fail_streak.py", "fable_evidence_log.py",
+         "fable_close_guard.py"]
+# expected hook-group count per event (PostToolUse carries two: streak + evidence log)
+EXPECT = {"SessionStart": 1, "PreToolUse": 1, "PostToolUse": 2, "Stop": 1}
 passed = failed = 0
 
 
@@ -62,7 +65,8 @@ try:
     # B. idempotent — second run must not duplicate
     run(skill, cfg)
     d = load(cfg)
-    check("install/idempotent", all(len(d["hooks"][e]) == 1 for e in d["hooks"]))
+    check("install/idempotent",
+          all(len(d["hooks"][e]) == EXPECT[e] for e in d["hooks"]))
 
     # C. merge — preserve unrelated config + a user's own hook
     with open(os.path.join(cfg, "settings.json"), "w") as f:

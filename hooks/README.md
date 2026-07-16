@@ -4,14 +4,15 @@ The enforcement layer: turn a few of fable-mode's prose rules into Claude Code
 hooks that actually block — ledger-before-delegation and close-verification,
 built around this repo's SPEC.md/PROGRESS.md conventions.
 
-## Four hooks + one lint CLI
+## Five hooks + one lint CLI
 
 | Hook | Event | What it does |
 |---|---|---|
 | `fable_profile_inject.py` | `SessionStart` | When the project has opted in, **auto-inject the tier by model + the six levers + ledger context recovery** (no need to type "use fable mode") |
 | `fable_spawn_guard.py` | `PreToolUse` (Agent\|Task\|Workflow) | When opted in: **block a detailed spawn with no ledger** (forces the plan gate) and **block any spawn requesting a model stronger than the session's** (the model ceiling) |
-| `fable_fail_streak.py` | `PostToolUse` (Bash) | Advisory, never blocks: at every 3rd **consecutive failing command**, inject the attribution ladder (harness → deployment → product; fix the class via an invariant). Streak state: `$TMPDIR/fable-mode-sessions/<sid>.fails`, reset on success. |
-| `fable_close_guard.py` | `Stop` | While the ledger still has unchecked items, **block ending the turn** (cures early stopping / spinning). When all items are checked, **block if any `- [x]` lacks an evidence marker** (`-- evidence:` / `证据:`) — evidence-on-close. |
+| `fable_fail_streak.py` | `PostToolUse` (Bash) | At every 3rd **consecutive failing command**, inject the attribution ladder (advisory). At the **6th**, turn structural: every further failure exits 2 with a demand to stop retrying, write `-- tried: <ruled out>` into the card, and restart fresh — the note (or a success) resets the streak. State: `$TMPDIR/fable-mode-sessions/<sid>.fails`. |
+| `fable_evidence_log.py` | `PostToolUse` (Bash) | Passive recorder: appends every command's **real outcome** (command, exit code, output tail) to `.fable/evidence.jsonl` — the machine-written record citations are checked against. Records even while PAUSED. |
+| `fable_close_guard.py` | `Stop` | While the ledger still has unchecked items, **block ending the turn** (cures early stopping / spinning). When all items are checked: **block if any `- [x]` lacks an evidence marker** (`-- evidence:` / `证据:`), **block if a cited evidence `command` has no successful run in the evidence log** (machine corroboration), and with `REPLAY: on` **block if a cited acceptance fails when re-run now**. |
 
 `fable_lint.py` is **not a hook** — a one-shot CLI (`python3 fable_lint.py <project_dir>`)
 for wrap-up or CI: SPEC exists and carries source tags ([measured]/[inferred]/[not-shown]
@@ -53,6 +54,8 @@ defaults to the conservative tier. This is SessionStart-only info (there is no
 - [x] 2. done -- evidence: pytest 21/21
 - [~] 3. not this round -- deferred: reason
 PAUSED: reason        <- optional line anywhere: suspend enforcement
+MODE: light           <- optional: light round — ceremony off, honesty stays
+REPLAY: on            <- optional: re-run cited acceptances at turn-end
 ROUTING: frugal       <- optional: model-routing profile for this round
 TIER: throughput      <- optional: concurrency tier for this round
 ```
@@ -91,7 +94,8 @@ state, so small tasks in a big project aren't taxed:
 | starting (no cards yet) | design gate armed | full (~1.6KB) |
 | **active** (open `- [ ]`) | full enforcement | full + context recovery |
 | **idle** (all closed) | close guard quiet; detailed fan-out still needs a new open card | one-liner (~0.4KB) |
-| **paused** (`PAUSED: reason` line) | off except model ceiling | one-liner (~0.2KB) |
+| **light** (`MODE: light` line) | design gate + open-cards-block-stop off; evidence honesty, evidence log, fail-streak and ceiling stay | full |
+| **paused** (`PAUSED: reason` line) | off except model ceiling + evidence log | one-liner (~0.2KB) |
 
 ## Model ceiling (mechanical)
 
@@ -141,7 +145,10 @@ use your actual absolute clone path if it differs:
       "command": "python3 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/hooks/fable_spawn_guard.py"}]}],
   "PostToolUse": [{"matcher": "Bash",
     "hooks": [{"type": "command",
-      "command": "python3 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/hooks/fable_fail_streak.py"}]}],
+      "command": "python3 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/hooks/fable_fail_streak.py"}]},
+    {"matcher": "Bash",
+     "hooks": [{"type": "command",
+      "command": "python3 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/hooks/fable_evidence_log.py"}]}],
   "Stop": [{"hooks": [{"type": "command",
     "command": "python3 ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/fable-mode/hooks/fable_close_guard.py"}]}]
 }
@@ -160,6 +167,8 @@ To disable entirely, remove the hooks block from settings.json.
 No third-party deps, just run:
 
 ```bash
-python3 tests/test_guards.py   # 13 cases: opt-in detection, ledger presence, small-spawn/fork exemptions, git-root boundary, loop-safety, fail-open
-python3 tests/test_inject.py   #  9 cases: per-model tier, env override, ledger context recovery, JSON envelope, fail-open
+python3 tests/test_guards.py    # opt-in detection, ledger presence, exemptions, git-root boundary, loop-safety, fail-open
+python3 tests/test_inject.py    # per-model tier, env override, ledger context recovery, JSON envelope, fail-open
+python3 tests/test_evidence.py  # evidence log recording, citation corroboration, REPLAY re-runs
+python3 tests/test_discipline.py # MODE: light triage, structural fail-streak
 ```

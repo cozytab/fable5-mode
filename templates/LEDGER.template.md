@@ -11,6 +11,16 @@ Only mark `- [x]` after the acceptance command actually ran — the Close Guard
 blocks turn-end for any `- [x]` without an evidence note (`-- evidence:` /
 `verified:` / `证据:`):
 
+Cite the acceptance `command` inside the evidence note — the Close Guard
+corroborates cited commands against `.fable/evidence.jsonl` (machine-written
+by the Evidence Logger): a citation that never ran, or never exited 0, blocks
+the stop. Optional directive lines (one per round, auditable):
+`MODE: light` (small round: ceremony off, evidence honesty stays) ·
+`REPLAY: on` (re-run cited acceptances before the round may end).
+On a grind (6+ consecutive failures) the Fail-Streak Guard demands a
+`-- tried: <what was ruled out>` note on the card — writing it resets the
+guard and is the handoff for a fresh-context restart.
+
 - [ ] 1. <card> — acceptance: `<command>`
 - [ ] 2. <card> — acceptance: `<command>`
 - [x] 0. (example) scaffold -- evidence: `pytest -q` -> 12 passed

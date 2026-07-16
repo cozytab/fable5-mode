@@ -47,7 +47,7 @@ Before code, write `docs/SPEC.md`: requirements, approach, **task cards** (skele
 Each card runs in a **fresh context**, fed only the relevant SPEC excerpt — no reasoning garbage from prior cards. Run acceptance the moment it's done; **don't advance until it passes**. Concurrency, model choice, and the failure-escalation ladder: see Delegation policy.
 
 ### 3. Adversarial self-check
-Important output is never "generate and ship". Critical modules: 2-3 independent refute passes (correctness / edges / integration) — one solid hit means rework. Wide solution spaces: N approaches + judge + synthesize. **Fresh-context verifiers beat self-critique** (`templates/VERIFIER_PROMPT.md`); verifier prompts say "assume broken, falsify hard", never "take a look".
+Important output is never "generate and ship". Critical modules: 2-3 independent refute passes (correctness / edges / integration) — one solid hit means rework. Wide solution spaces: N approaches + judge + synthesize. **Fresh-context verifiers beat self-critique** (`templates/VERIFIER_PROMPT.md`); verifier prompts say "assume broken, falsify hard", never "take a look". **Information isolation is what makes it adversarial**: the verifier gets ONLY the SPEC excerpt + the artifact — never the worker's transcript, notes, claimed evidence, or expected verdict; a verifier that reads the worker's story grades the story, not the work. Prefer 2-3 verifiers with *different* lenses over N identical ones, and never a verifier weaker than the implementer.
 
 **Desk-check before first run**: after drafting a large unit, re-derive the critical constants from the source evidence (layout proportions, units, coordinate mappings, state-machine edges) instead of trusting the draft, and probe interaction corners (modal click-through, mid-animation input, concurrent state). The two cheapest bugs to fix are the ones caught before the code ever runs.
 
@@ -130,12 +130,14 @@ Selecting a profile: the user's words above, env `FABLE_ROUTING=quality|balanced
 
 ## Enforcement layer (hooks — mechanics in `hooks/README.md`)
 
-Four hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
+Five hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
 
 ```
 - [ ] 1. card (machine-checkable acceptance)   <- open: guards enforce
-- [x] 2. done -- evidence: pytest 21/21        <- [x] REQUIRES a substantive evidence note
+- [x] 2. done -- evidence: `pytest -q` 21/21   <- [x] REQUIRES substantive evidence; a cited `command` is checked against the machine-written evidence log
 - [~] 3. not this round -- deferred: reason
+MODE: light                                    <- optional: light round (triage) — ceremony off, honesty rules stay
+REPLAY: on                                     <- optional: re-run cited acceptances before the round may end
 PAUSED: reason                                 <- a line anywhere: enforcement off
 ```
 
@@ -144,13 +146,16 @@ be attributable. Evidence notes must be substantive: `evidence: ok` counts as
 missing.)
 
 - **Spawn Guard** (PreToolUse Agent/Task/Workflow): blocks a detailed spawn while the ledger has no **open** cards — no ledger, and equally a ledger holding only a finished round's closed cards (design gate: new fan-out needs a live card) — and blocks any spawn requesting a **model stronger than the session's** (model ceiling — checked on the `model` param and `model:` literals in Workflow scripts; stays active even when paused, it protects quota, not workflow).
-- **Fail-Streak Reminder** (PostToolUse Bash, advisory): every 3rd consecutive failing command injects the attribution ladder — stops grinding on the wrong layer mechanically, not by willpower.
-- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain, **and** while any `- [x]` lacks an `-- evidence:` note (evidence-on-close: adjectives don't close cards).
+- **Fail-Streak Guard** (PostToolUse Bash): every 3rd consecutive failing command injects the attribution ladder (advisory); at the **6th** it turns structural — every further failure is answered with a blocking demand to stop retrying, distill `-- tried: <what was ruled out>` into the card, and restart from a fresh context. Writing the note (or a success) resets it: the distillation is the exit, so the lesson survives the context that learned it.
+- **Evidence Logger** (PostToolUse Bash, passive): appends every command's real outcome (command, exit code, output tail) to `.fable/evidence.jsonl` — the machine-written record the Close Guard checks citations against. Records even while paused; evidence gaps are worse than pauses.
+- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain, while any `- [x]` lacks an `-- evidence:` note (evidence-on-close: adjectives don't close cards), while any cited evidence `command` has **no successful run in the evidence log** (machine corroboration: a citation that never ran is not evidence), and — with `REPLAY: on` — while any cited acceptance fails when **re-run now** ('passed once' is not 'still passes').
 - **Profile Injector** (SessionStart): injects tier + routing + habits, **sized to the ledger state** — full when a round is starting/active, minimal when idle, one line when paused.
 
 **Wrap-up lint**: `python3 <skill-dir>/hooks/fable_lint.py <project_dir>` — machine-checks the discipline itself (SPEC source tags present, open cards name acceptance, closed cards carry evidence). Run it at step 7 of the execution template; findings are open work.
 
-**Per-task granularity**: *active* (open cards) = full enforcement; *idle* (no/all-closed cards) = close guard quiet and small tasks flow freely, but a **detailed** fan-out still needs a live card first; *paused* (a `PAUSED: reason` line) = guards off except the ceiling. Write PAUSED only when the user steers to work unrelated to the round; remove it to resume. Small spawns (<1500 chars) and forks skip the design gate; everything fails open (a guard bug never bricks the session); loop-safe.
+**Per-task granularity**: *active* (open cards) = full enforcement; *idle* (no/all-closed cards) = close guard quiet and small tasks flow freely, but a **detailed** fan-out still needs a live card first; *light* (a `MODE: light` line) = triage for small rounds — design gate and open-cards-block-stop off, evidence honesty and the ceiling stay armed; *paused* (a `PAUSED: reason` line) = guards off except the ceiling. Write PAUSED only when the user steers to work unrelated to the round; remove it to resume. Small spawns (<1500 chars) and forks skip the design gate; everything fails open (a guard bug never bricks the session); loop-safe.
+
+**Triage — pick the round's weight deliberately**: full ceremony (SPEC + cards + evidence + replay) earns its cost on long, multi-file, hard-to-reverse work; on a small, immediately-verifiable round it is overhead the model will learn to game. Start a small round with `MODE: light`; upgrade to full the moment scope grows past a couple of files or the work becomes hard to verify by eye. Choosing the weight is part of the discipline — applying maximum ceremony everywhere is not rigor, it's noise.
 
 **For substantial work: after writing the SPEC, `mkdir .fable` + create `.fable/LEDGER.md` to get the mechanical backstop.** In the user's repo, suggest gitignoring `.fable/` (round state) while committing `docs/SPEC.md`/`PROGRESS.md` (durable docs).
 
