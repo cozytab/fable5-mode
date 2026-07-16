@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
     closed_without_evidence, evidence_log_path, uncorroborated_citations,
-    read_replay, cited_commands,
+    read_mode, read_replay, cited_commands,
 )
 
 MAX_LIST = 12
@@ -103,6 +103,8 @@ def main():
     open_items, _has_any, paused = parse_ledger(path)
     if paused:
         return 0  # round paused -> enforcement off
+    if read_mode(path) == "light":
+        open_items = []  # light round: open cards don't block the stop
     if not open_items:
         # All cards closed -> enforce evidence-on-close before allowing stop.
         bad = closed_without_evidence(path)

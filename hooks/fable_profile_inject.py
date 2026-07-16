@@ -145,8 +145,11 @@ def build_context(profile, model, ledger_state, open_items, routing):
         "note. Cite the acceptance `command` in the evidence note — cited "
         "commands are corroborated against the machine-written evidence log "
         "(.fable/evidence.jsonl); a citation that never ran (or never exited "
-        "0) blocks the stop. Optional ledger directive: `REPLAY: on` (cited "
-        "acceptances re-run before the round may end).",
+        "0) blocks the stop. Optional ledger directives: `REPLAY: on` (cited "
+        "acceptances re-run before the round may end); `MODE: light` (small "
+        "round — design gate and open-cards-block-stop off, evidence honesty "
+        "and the ceiling stay). Verifiers get ONLY the SPEC excerpt + the "
+        "artifact — never your claims, transcript, or expected verdict.",
         "Fable-5 habits: (1) audit every progress claim against a tool "
         "result — unverified means say 'unverified'; (2) don't end the turn "
         "on an actionable plan/promise — act now; (3) lead with the outcome; "

@@ -28,7 +28,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _fable_common import (  # noqa: E402
     read_hook_input, start_dir, find_fable_dir, ledger_path, parse_ledger,
-    model_tier, load_session_model,
+    model_tier, load_session_model, read_mode,
 )
 
 
@@ -107,6 +107,9 @@ def main():
 
     if is_fork(tool_input):
         return 0  # forks inherit full context; exempt from the spec tax
+
+    if read_mode(ledger_path(fable_dir)) == "light":
+        return 0  # light round: ceremony off, ceiling stayed active above
 
     try:
         threshold = int(os.environ.get("FABLE_SPAWN_MIN_CHARS", "1500"))

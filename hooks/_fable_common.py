@@ -274,6 +274,25 @@ def read_tier(path):
 
 
 _REPLAY_RE = re.compile(r"^REPLAY\s*[:：]\s*(on|off)\b", re.IGNORECASE)
+_MODE_RE = re.compile(r"^MODE\s*[:：]\s*(light|full)\b", re.IGNORECASE)
+
+
+def read_mode(path):
+    """Per-round ceremony weight from a `MODE: light|full` ledger line.
+
+    'light' = triage for small rounds: the design gate and open-cards-block-
+    stop are off, but evidence honesty (and the model ceiling) stay armed.
+    Default 'full'. Fail-open to 'full' on any read problem.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _MODE_RE.match(line.strip())
+                if m:
+                    return m.group(1).lower()
+    except Exception:
+        return "full"
+    return "full"
 
 
 def read_replay(path):
