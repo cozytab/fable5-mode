@@ -130,12 +130,13 @@ Selecting a profile: the user's words above, env `FABLE_ROUTING=quality|balanced
 
 ## Enforcement layer (hooks — mechanics in `hooks/README.md`)
 
-Four hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
+Five hooks turn the most-shirked rules into hard blocks. Armed **per project** by a `.fable/` directory (searched upward, bounded at the git root); without it they pass through silently. Pressure applies **per round** via `.fable/LEDGER.md`:
 
 ```
 - [ ] 1. card (machine-checkable acceptance)   <- open: guards enforce
-- [x] 2. done -- evidence: pytest 21/21        <- [x] REQUIRES a substantive evidence note
+- [x] 2. done -- evidence: `pytest -q` 21/21   <- [x] REQUIRES substantive evidence; a cited `command` is checked against the machine-written evidence log
 - [~] 3. not this round -- deferred: reason
+REPLAY: on                                     <- optional: re-run cited acceptances before the round may end
 PAUSED: reason                                 <- a line anywhere: enforcement off
 ```
 
@@ -145,7 +146,8 @@ missing.)
 
 - **Spawn Guard** (PreToolUse Agent/Task/Workflow): blocks a detailed spawn while the ledger has no **open** cards — no ledger, and equally a ledger holding only a finished round's closed cards (design gate: new fan-out needs a live card) — and blocks any spawn requesting a **model stronger than the session's** (model ceiling — checked on the `model` param and `model:` literals in Workflow scripts; stays active even when paused, it protects quota, not workflow).
 - **Fail-Streak Reminder** (PostToolUse Bash, advisory): every 3rd consecutive failing command injects the attribution ladder — stops grinding on the wrong layer mechanically, not by willpower.
-- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain, **and** while any `- [x]` lacks an `-- evidence:` note (evidence-on-close: adjectives don't close cards).
+- **Evidence Logger** (PostToolUse Bash, passive): appends every command's real outcome (command, exit code, output tail) to `.fable/evidence.jsonl` — the machine-written record the Close Guard checks citations against. Records even while paused; evidence gaps are worse than pauses.
+- **Close Guard** (Stop): blocks ending the turn while open `- [ ]` items remain, while any `- [x]` lacks an `-- evidence:` note (evidence-on-close: adjectives don't close cards), while any cited evidence `command` has **no successful run in the evidence log** (machine corroboration: a citation that never ran is not evidence), and — with `REPLAY: on` — while any cited acceptance fails when **re-run now** ('passed once' is not 'still passes').
 - **Profile Injector** (SessionStart): injects tier + routing + habits, **sized to the ledger state** — full when a round is starting/active, minimal when idle, one line when paused.
 
 **Wrap-up lint**: `python3 <skill-dir>/hooks/fable_lint.py <project_dir>` — machine-checks the discipline itself (SPEC source tags present, open cards name acceptance, closed cards carry evidence). Run it at step 7 of the execution template; findings are open work.

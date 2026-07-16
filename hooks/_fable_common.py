@@ -125,6 +125,128 @@ def load_session_model(session_id):
 EVIDENCE_RE = re.compile(r"(evidence|verified|证据|凭证|验证)\s*[:：]", re.IGNORECASE)
 
 
+# --- machine-written evidence log (.fable/evidence.jsonl) ---
+#
+# The Evidence Logger hook appends one JSON line per Bash command:
+#   {"ts": <epoch>, "cmd": <command>, "exit": <int>, "tail": <output tail>}
+# The Close Guard checks cited `commands` on `- [x]` cards against this log,
+# so "the acceptance actually ran" is machine truth, not a self-reported note.
+
+EVIDENCE_LOG = "evidence.jsonl"
+EVIDENCE_LOG_MAX_BYTES = 512 * 1024  # rotate: keep the newest half beyond this
+EVIDENCE_TAIL_CHARS = 200
+
+_BACKTICK_RE = re.compile(r"`([^`]+)`")
+
+
+def evidence_log_path(fable_dir):
+    return os.path.join(fable_dir, EVIDENCE_LOG)
+
+
+def response_exit_code(tool_response):
+    """Best-effort exit code from a Bash tool_response; None when unknown."""
+    r = tool_response
+    if isinstance(r, str):
+        m = re.search(r"[Ee]xit code[: ]+([0-9]+)", r)
+        return int(m.group(1)) if m else None
+    if not isinstance(r, dict):
+        return None
+    for key in ("exitCode", "exit_code", "code", "returncode"):
+        v = r.get(key)
+        if isinstance(v, int):
+            return v
+    for key in ("is_error", "isError"):
+        if r.get(key) is True:
+            return 1
+    text = " ".join(str(r.get(k, "")) for k in ("stdout", "stderr", "output"))
+    m = re.search(r"[Ee]xit code[: ]+([0-9]+)", text)
+    return int(m.group(1)) if m else None
+
+
+def append_evidence(fable_dir, cmd, exit_code, tail):
+    """Append one run record; rotate the log when it grows too large.
+    Best-effort, fail-open — recording must never disturb the session."""
+    try:
+        path = evidence_log_path(fable_dir)
+        try:
+            if os.path.getsize(path) > EVIDENCE_LOG_MAX_BYTES:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    lines = fh.readlines()
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.writelines(lines[len(lines) // 2:])
+        except OSError:
+            pass
+        rec = {"ts": time.time(), "cmd": str(cmd)[:2000],
+               "exit": exit_code,
+               "tail": str(tail or "")[-EVIDENCE_TAIL_CHARS:]}
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def _norm_cmd(s):
+    return re.sub(r"\s+", " ", str(s)).strip()
+
+
+def cited_commands(card_line):
+    """Backtick-quoted commands in the *evidence part* of a `- [x]` line.
+    Returns [] when the evidence note cites no command (prose-only note)."""
+    m = EVIDENCE_RE.search(card_line)
+    if not m:
+        return []
+    return [_norm_cmd(c) for c in _BACKTICK_RE.findall(card_line[m.end():])
+            if _norm_cmd(c)]
+
+
+def evidence_log_has_run(log_path, cited, want_success=True):
+    """True if the log records a run whose command matches `cited`
+    (normalized substring, either direction) — successful when want_success."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                cmd = _norm_cmd(rec.get("cmd", ""))
+                if not cmd:
+                    continue
+                if cited in cmd or cmd in cited:
+                    if not want_success or rec.get("exit") == 0:
+                        return True
+    except Exception:
+        return False
+    return False
+
+
+def uncorroborated_citations(ledger_p, log_path):
+    """`- [x]` cards whose cited evidence command never ran successfully.
+
+    Machine check for "the acceptance actually ran": a card that cites a
+    `command` as evidence must have a successful run of that command in the
+    evidence log. Cards with prose-only evidence are not checked here (the
+    substantive-string rule still applies to them). Returns [] when the log
+    doesn't exist yet (projects predating the logger) — fail-open.
+    """
+    if not os.path.isfile(log_path):
+        return []
+    bad = []
+    try:
+        with open(ledger_p, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                s = line.strip()
+                if s[:5].lower() != "- [x]":
+                    continue
+                cites = cited_commands(s)
+                if cites and not any(
+                        evidence_log_has_run(log_path, c) for c in cites):
+                    bad.append(s)
+    except Exception:
+        return []
+    return bad
+
+
 # --- model-routing profiles (quality / balanced / frugal) ---
 
 ROUTING_PROFILES = ("quality", "balanced", "frugal")
@@ -149,6 +271,22 @@ def read_tier(path):
     except Exception:
         return None
     return None
+
+
+_REPLAY_RE = re.compile(r"^REPLAY\s*[:：]\s*(on|off)\b", re.IGNORECASE)
+
+
+def read_replay(path):
+    """True when the ledger opts into acceptance replay (`REPLAY: on`)."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                m = _REPLAY_RE.match(line.strip())
+                if m:
+                    return m.group(1).lower() == "on"
+    except Exception:
+        return False
+    return False
 
 
 def read_routing(path):
